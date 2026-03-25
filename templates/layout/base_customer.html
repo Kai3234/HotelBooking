@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Khách hàng{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles_base_customer.css') }}">
+</head>
+<body>
+    <!-- NAVBAR CHUNG -->
+    <header>
+        <div class="navbar">
+            <a href="/" class="logo"><i class="fa-solid fa-bed"></i> RED HOTEL</a>
+            <ul class="nav-menu">
+                <li><a href="/">Trang chủ</a></li>
+                <li><a href="/rooms_list" class="text-red">Danh sách phòng</a></li>
+                <li><a href="/services" class="text-red">Dịch vụ</a></li>
+                <li>
+                    <a href="/cart"><i class="fa-solid fa-cart-shopping"></i> Giỏ hàng</a>
+                </li>
+
+                {% if session.current_user %}
+                <li class="user-dropdown">
+                    <a href="#" class="btn-primary">
+                        <i class="fa-regular fa-user"></i>
+                                {{ session.current_user.HoTen }}
+
+
+                        <i class="fa-solid fa-caret-down"></i>
+                    </a>
+
+                    <ul class="dropdown-menu">
+                        <li><a href="/profile"><i class="fa-solid fa-user"></i> Hồ sơ</a></li>
+                        <li><a href="/history"><i class="fa-solid fa-clock-rotate-left"></i> Lịch sử đặt</a></li>
+                        <li class="divider"></li>
+                        <li><a href="/logout"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</a></li>
+                    </ul>
+                </li>
+                {% else %}
+                <li>
+                    <a href="/login" class="btn-primary">
+                        Đăng nhập / Đăng ký
+                    </a>
+                </li>
+
+                {% endif %}
+            </ul>
+        </div>
+    </header>
+
+    <!-- CONTENT -->
+    <div class="container">
+
+        {% block content %}{% endblock %}
+
+    </div>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

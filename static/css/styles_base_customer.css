@@ -1,0 +1,158 @@
+/* ==============================================================
+   1. BIẾN MÀU SẮC (BASE)
+   ============================================================== */
+:root {
+    --primary-red: #C8102E;
+    --hover-red: #9B0C22;
+    --light-red: #FDE8EA;
+    --bg-light: #F8F9FA;
+    --text-main: #2D3436;
+    --text-muted: #636E72;
+    --white: #FFFFFF;
+    --border-color: #DFE6E9;
+    --success: #00b894;
+    --warning: #fdcb6e;
+    --shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    --shadow-hover: 0 10px 25px rgba(200, 16, 46, 0.15);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+body { background-color: var(--bg-light); color: var(--text-main); line-height: 1.6; padding-bottom: 100px; }
+a { text-decoration: none; color: inherit; transition: all 0.3s; }
+ul { list-style: none; }
+
+/* ==============================================================
+   2. HEADER (COPY TỪ TRANG CHỦ)
+   ============================================================== */
+header { background: var(--white); box-shadow: var(--shadow); position: sticky; top: 0; z-index: 100; }
+.navbar { max-width: 1200px; margin: 0 auto; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
+.logo { font-size: 24px; font-weight: 800; color: var(--primary-red); display: flex; align-items: center; gap: 8px; }
+.nav-menu { display: flex; gap: 30px; align-items: center; font-weight: 500; }
+.nav-menu a:hover { color: var(--primary-red); }
+
+/* ==============================================================
+   3. UI KIT STYLES (CÁC THÀNH PHẦN CHO TEAM DÙNG)
+   ============================================================== */
+.container { max-width: 1200px; margin: 40px auto; padding: 0 20px; }
+.guide-section { background: var(--white); padding: 30px; border-radius: 12px; box-shadow: var(--shadow); margin-bottom: 40px; }
+.guide-title { font-size: 20px; color: var(--primary-red); border-bottom: 2px dashed var(--border-color); padding-bottom: 10px; margin-bottom: 20px; }
+
+/* NÚT BẤM (BUTTONS) */
+.btn { padding: 10px 24px; border-radius: 6px; font-size: 15px; font-weight: 600; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: 0.3s; text-align: center; justify-content: center;}
+.btn-primary { background-color: var(--primary-red); color: var(--white) !important; }
+.btn-primary:hover { background-color: var(--hover-red); }
+.btn-outline { background-color: transparent; color: var(--primary-red); border: 2px solid var(--primary-red); }
+.btn-outline:hover { background-color: var(--primary-red); color: var(--white) !important; }
+.btn-block { width: 100%; display: block; padding: 14px; font-size: 16px; }
+
+/* TAGS & BADGES (Dùng cho trạng thái đơn hàng, loại phòng) */
+.badge { padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; display: inline-block; }
+.badge-red { background: var(--light-red); color: var(--primary-red); }
+.badge-success { background: #e8f8f5; color: var(--success); }
+.badge-gray { background: var(--border-color); color: var(--text-muted); }
+
+/* FORM NHẬP LIỆU (Dùng cho Trang Đăng ký, Thanh toán, Hồ sơ) */
+.form-group { margin-bottom: 20px; display: flex; flex-direction: column; }
+.form-label { font-size: 14px; font-weight: 600; color: var(--text-main); margin-bottom: 8px; }
+.form-control { padding: 12px 15px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 15px; transition: 0.3s; outline: none; background: var(--white); }
+.form-control:focus { border-color: var(--primary-red); box-shadow: 0 0 0 3px rgba(200, 16, 46, 0.1); }
+
+/* Checkbox custom */
+.custom-checkbox { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 15px;}
+.custom-checkbox input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--primary-red); cursor: pointer; }
+
+/* CARD PHÒNG (Room Card) */
+.room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 30px; }
+.room-card { background: var(--white); border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); transition: transform 0.3s, box-shadow 0.3s; }
+.room-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-hover); }
+.room-image { width: 100%; height: 220px; object-fit: cover; }
+.room-body { padding: 20px; }
+.room-title { font-size: 20px; margin-bottom: 10px; }
+.room-attributes { display: flex; gap: 15px; color: var(--text-muted); font-size: 14px; margin-bottom: 15px; }
+.room-attributes i { color: var(--primary-red); }
+.room-price-row { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border-color); }
+.price-text { font-size: 22px; font-weight: bold; color: var(--primary-red); }
+.price-text span { font-size: 13px; font-weight: normal; color: var(--text-muted); }
+
+/* CARD DỊCH VỤ (Service Card - Dùng cho trang Giỏ hàng / Thêm dịch vụ) */
+.service-card { display: flex; align-items: center; justify-content: space-between; padding: 15px; border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 15px; transition: 0.3s; }
+.service-card:hover { border-color: var(--primary-red); }
+.service-info { display: flex; align-items: center; gap: 15px; }
+.service-icon { width: 50px; height: 50px; background: var(--light-red); color: var(--primary-red); border-radius: 8px; display: flex; justify-content: center; align-items: center; font-size: 24px; }
+.service-text h4 { font-size: 16px; margin-bottom: 4px; }
+.service-text p { font-size: 14px; color: var(--primary-red); font-weight: 600; }
+.qty-control { display: flex; align-items: center; border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden; }
+.qty-btn { background: var(--bg-light); border: none; width: 35px; height: 35px; font-size: 16px; cursor: pointer; transition: 0.2s;}
+.qty-btn:hover { background: var(--border-color); }
+.qty-input { width: 40px; text-align: center; border: none; font-size: 15px; font-weight: 600; outline: none; }
+
+/* THÔNG BÁO FLASH (Dùng cho Jinja2 Flash messages) */
+.alert { padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; gap: 15px; font-size: 15px; font-weight: 500; }
+.alert-success { background-color: #e8f8f5; color: #16a085; border: 1px solid #bce8f1; }
+.alert-danger { background-color: var(--light-red); color: var(--hover-red); border: 1px solid #f5c6cb; }
+
+/* TIẾN TRÌNH ĐẶT PHÒNG (Breadcrumb/Steps) */
+.booking-steps { display: flex; align-items: center; justify-content: center; margin-bottom: 30px; gap: 10px; font-weight: 600; color: var(--text-muted); }
+.step { display: flex; align-items: center; gap: 8px; }
+.step.active { color: var(--primary-red); }
+.step-divider { color: var(--border-color); }
+
+.user-dropdown {
+    position: relative;
+}
+
+.user-dropdown a {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* MENU */
+.dropdown-menu {
+    position: absolute;
+    top: 110%;
+    right: 0;
+    background: white;
+    min-width: 200px;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    overflow: hidden;
+
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px);
+    transition: 0.3s;
+    z-index: 999;
+}
+
+/* ITEM */
+.dropdown-menu li a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 15px;
+    color: #333;
+    font-size: 14px;
+    transition: 0.2s;
+}
+
+.dropdown-menu li a i {
+    color: #C8102E;
+}
+
+.dropdown-menu li a:hover {
+    background: #f5f5f5;
+}
+
+/* DIVIDER */
+.dropdown-menu .divider {
+    height: 1px;
+    background: #eee;
+}
+
+/* SHOW */
+.user-dropdown:hover .dropdown-menu {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
