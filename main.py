@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, flash, url_for, session
+from flask import Flask, render_template, request, redirect, flash, url_for, session, get_flashed_messages
 import requests
 
 # Create a flask app
@@ -11,6 +11,7 @@ BASE_URL = 'http://127.0.0.1:5000/'
 
 @app.route('/')
 def index():
+    get_flashed_messages()
     if 'current_user' in session:
         if session['current_user']['ChucVu'] == 'nhanvien':
             if session['current_user']['LaAdmin'] == 1:
@@ -92,6 +93,7 @@ def logout():
 
 @app.route('/backend_dashboard')
 def backend_dashboard():
+    get_flashed_messages()
     if 'current_user' in session:
         if session['current_user']['ChucVu'] == 'nhanvien':
             if session['current_user']['LaAdmin'] == 1:
