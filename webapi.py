@@ -1,0 +1,73 @@
+# Import flask and sqlite3 modules
+from flask import Flask, request, jsonify
+import sqlite3
+
+app = Flask(__name__)
+
+sqldbname = 'db/website.db'
+
+# Hàm kết nối tới Cơ sở dữ liệu SQLite
+def get_db():
+    # Đảm bảo file hotel.db nằm cùng cấp thư mục với file api_app.py này
+    conn = sqlite3.connect(sqldbname)
+    conn.row_factory = sqlite3.Row # Giúp lấy dữ liệu dạng Dictionary thay vì Tuple
+    return conn
+
+@app.route('/login', methods=['POST'])
+def login_api():
+    # Lấy dữ liệu JSON được gửi từ Frontend (cổng 5001)
+    data = request.get_json()
+    if not data:
+        return jsonify({"status": "error", "message": "Dữ liệu gửi lên không hợp lệ!"}), 400
+
+    email= data.get('email')
+    password = data.get('password')
+    role = data.get('role')
+
+    conn = get_db()
+
+    # --- 1. XỬ LÝ CHO NHÂN VIÊN ---
+    if role == 'nhanvien':
+        # Lưu ý: Theo schema trước đó NHANVIEN đăng nhập bằng SDT.
+        # Nếu bạn đã thêm cột Email vào NHANVIEN thì hãy đổi `SDT = ?` thành `Email = ?`
+        query = "SELECT * FROM NHANVIEN WHERE Email = ? AND MatKhau = ?"
+        user = conn.execute(query, (email, password)).fetchone()
+
+        if user:
+            conn.close()
+            return jsonify({
+                "status": "success",
+                "data": {
+                    "MaTK": user['MaNV'],
+                    "HoTen": user['HoTen'],
+                    "LaAdmin": user['LaAdmin']
+                }
+            })
+
+    # --- 2. XỬ LÝ CHO KHÁCH HÀNG ---
+    elif role == 'khachhang':
+        query = "SELECT * FROM KHACHHANG WHERE Email = ? AND MatKhau = ?"
+        user = conn.execute(query, (email, password)).fetchone()
+
+        if user:
+            conn.close()
+            return jsonify({
+                "status": "success",
+                "data": {
+                    "MaTK": user['MaKH'],
+                    "HoTen": user['HoTen'],
+                    "LaAdmin": 0 # Khách hàng không có quyền Admin
+                }
+            })
+
+    conn.close()
+    # Trả về lỗi nếu không tìm thấy User hoặc mật khẩu sai
+    return jsonify({
+        "status": "error",
+        "message": "Thông tin đăng nhập hoặc mật khẩu không chính xác!"
+    }), 200 # Frontend của bạn kiểm tra status_code == 200 để lấy JSON nên để 200
+
+
+if __name__ == '__main__':
+    # Chạy API ở cổng 5000
+    app.run(debug=True, port=5000)
