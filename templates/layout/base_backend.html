@@ -15,20 +15,51 @@
         </div>
         <ul class="sidebar-menu">
             <li class="menu-header">NGHIỆP VỤ LỄ TÂN</li>
-            <li class="active"><a href="#"><i class="fa-solid fa-chart-line"></i> Dashboard lễ tân</a></li>
+            <li class="{{ 'active' if request.endpoint == 'dashboard_rec' else '' }}">
+                <a href="/dashboard_rec">
+                    <i class="fa-solid fa-chart-line"></i> Dashboard lễ tân
+                </a>
+            </li>
             <li><a href="#"><i class="fa-solid fa-calendar-check"></i> Quản lý Đặt phòng</a></li>
 
             {% if session.current_user.LaAdmin == 1 %}
             <li class="menu-header">NGHIỆP VỤ ADMIN</li>
-            <li class="active"><a href="/dashboard_admin"><i class="fa-solid fa-chart-line"></i> Dashboard Admin</a></li>
-            <li><a href="/rooms_admin"><i class="fa-solid fa-bed"></i> Quản lý Phòng</a></li>
-            <li><a href="/rooms_types_admin"><i class="fa-solid fa-layer-group"></i> Quản lý Loại phòng</a></li>
-            <li><a href="/services_admin"><i class="fa-solid fa-bell-concierge"></i> Quản lý Dịch vụ</a></li>
-            <li><a href="/staffs_admin"><i class="fa-solid fa-user-tie"></i> Quản lý Nhân viên</a></li>
-            <li><a href="/customers_admin"><i class="fa-solid fa-users"></i> Quản lý Khách hàng</a></li>
+            <li class="{{ 'active' if request.endpoint == 'dashboard_admin' else '' }}">
+                <a href="/dashboard_admin">
+                    <i class="fa-solid fa-chart-line"></i> Dashboard Admin
+                </a>
+            </li>
+
+            <li class="{{ 'active' if request.endpoint == 'rooms_admin' else '' }}">
+                <a href="/rooms_admin">
+                    <i class="fa-solid fa-bed"></i> Quản lý Phòng
+                </a>
+            </li>
+
+            <li class="{{ 'active' if request.endpoint == 'rooms_types_admin' else '' }}">
+                <a href="/rooms_types_admin">
+                    <i class="fa-solid fa-layer-group"></i> Quản lý Loại phòng
+                </a>
+            </li>
+
+            <li class="{{ 'active' if request.endpoint == 'services_admin' else '' }}">
+                <a href="/services_admin">
+                    <i class="fa-solid fa-bell-concierge"></i> Quản lý Dịch vụ
+                </a>
+            </li>
+
+            <li class="{{ 'active' if request.endpoint == 'staffs_admin' else '' }}">
+                <a href="/staffs_admin">
+                    <i class="fa-solid fa-user-tie"></i> Quản lý Nhân viên
+                </a>
+            </li>
+
+            <li class="{{ 'active' if request.endpoint == 'customers_admin' else '' }}">
+                <a href="/customers_admin">
+                    <i class="fa-solid fa-users"></i> Quản lý Khách hàng
+                </a>
+            </li>
             {% endif %}
-
-
         </ul>
 
     </aside>
