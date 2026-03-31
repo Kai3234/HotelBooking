@@ -134,12 +134,23 @@ def backend_dashboard():
         return redirect(url_for('dashboard_rec'))
     return redirect(url_for('index'))
 
+@app.route('/mockup/admin')
+def mockup_admin():
+    return render_template('mockup/base_backend_mockup.html')
+
+
+@app.route('/mockup/customer')
+def mockup_dashboard():
+    return render_template('mockup/index_mockup.html')
 
 # Import tất cả các hàm, biến và route
 from admin import *
 from receptionist import *
 from customer import *
 
+
+
+
 if __name__ == '__main__':
     #Đặt cổng khác bởi vì 5000 đã được sử dụng
-    app.run(debug=True, port=5001)
+    app.run(debug=True, port=5001, use_reloader=False)
