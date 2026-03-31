@@ -2,9 +2,63 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng ký - RedHotel</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='/icon/hotel-solid-full.svg') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles_auth.css') }}">
 </head>
 <body>
+    <div class="login-card">
+        <div class="logo-box">
+            <a href="/"><i class="fa-solid fa-hotel"></i></a>
+            <h2>RED HOTEL</h2>
+            <p>Đăng ký tài khoản khách hàng</p>
+        </div>
 
+        <!-- Thông báo lỗi/thành công -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        <i class="fa-solid {{ 'fa-circle-exclamation' if category == 'danger' else 'fa-circle-check' }}"></i>
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form action="{{ url_for('register') }}" method="POST">
+            <div class="form-group">
+                <label class="form-label">Họ và tên</label>
+                <input type="text" name="fullname" class="form-control" placeholder="Nguyễn..." required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Email</label>
+                <input type="email" name="email" class="form-control" placeholder="example@gmail.com" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Số điện thoại</label>
+                <input type="text" name="phone" class="form-control" placeholder="0999999999" required>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Mật khẩu</label>
+                <input type="password" name="password" class="form-control" placeholder="••••••••" required>
+            </div>
+
+            <button type="submit" class="btn-primary">Đăng ký ngay</button>
+
+            <div class="register-link">
+                Đã có tài khoản? <a href="/login">Đăng nhập</a>
+            </div>
+
+            <div class="home-link">
+                <a href="/"><i class="fa-solid fa-house"></i> Về trang chủ</a>
+            </div>
+        </form>
+    </div>
 </body>
 </html>

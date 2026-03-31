@@ -68,6 +68,45 @@ def login_api():
     }), 200 # Frontend của bạn kiểm tra status_code == 200 để lấy JSON nên để 200
 
 
+@app.route('/register', methods=['POST'])
+def register_api():
+    data = request.get_json()
+    if not data:
+        return jsonify({"status": "error", "message": "Dữ liệu không hợp lệ"}), 400
+
+    fullname = data.get('fullname')
+    email = data.get('email')
+    phone = data.get('phone')
+    password = data.get('password')
+
+    conn = get_db()
+    try:
+        # 1. Kiểm tra email đã tồn tại trong bảng KHACHHANG hay chưa
+        check_user = conn.execute("SELECT * FROM KHACHHANG WHERE Email = ?", (email,)).fetchone()
+
+        if check_user:
+            return jsonify({
+                "status": "error",
+                "message": "Email này đã được sử dụng. Vui lòng chọn email khác!"
+            }), 200  # Trả về 200 để Client dễ xử lý JSON message
+
+        # 2. Thêm mới khách hàng
+        conn.execute(
+            "INSERT INTO KHACHHANG (HoTen, Email, SDT, MatKhau) VALUES (?, ?, ?, ?)",
+            (fullname, email, phone, password)
+        )
+        conn.commit()
+
+        return jsonify({
+            "status": "success",
+            "message": "Đăng ký tài khoản thành công!"
+        })
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
+
 if __name__ == '__main__':
     # Chạy API ở cổng 5000
     app.run(debug=True, port=5000)

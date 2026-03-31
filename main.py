@@ -85,6 +85,38 @@ def login():
     return render_template('auth/login.html')
 
 
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    # Kiểm tra nếu đã đăng nhập thì đẩy về trang tương ứng
+    if 'current_user' in session:
+        if session['current_user']['ChucVu'] == 'nhanvien':
+            return redirect(url_for('backend_dashboard'))
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        # Lấy dữ liệu từ form HTML
+        payload = {
+            "fullname": request.form.get('fullname'),
+            "email": request.form.get('email'),
+            "phone": request.form.get('phone'),
+            "password": request.form.get('password')
+        }
+
+        # Gửi yêu cầu đến Backend API
+        try:
+            response = requests.post(f"{BASE_URL}/register", json=payload)
+            result = response.json()
+
+            if result['status'] == 'success':
+                flash(result['message'], 'success')
+                return redirect(url_for('login')) # Chuyển hướng sang đăng nhập
+            else:
+                flash(result['message'], 'danger')
+        except Exception:
+            flash("Không thể kết nối đến hệ thống máy chủ API!", "danger")
+
+    return render_template('auth/register.html')
+
 @app.route('/logout')
 def logout():
     session.pop('current_user', None)  # Xóa dict current_user khỏi session
@@ -97,10 +129,10 @@ def backend_dashboard():
     if 'current_user' in session:
         if session['current_user']['ChucVu'] == 'nhanvien':
             if session['current_user']['LaAdmin'] == 1:
-                return render_template('admin/dashboard_admin.html')
-            return render_template('receptionist/dashboard_rec.html')
-        return render_template('customer/index.html')
-    return render_template('customer/index.html')
+                return redirect(url_for('dashboard_admin'))
+            return redirect(url_for('dashboard_admin'))
+        return redirect(url_for('dashboard_rec'))
+    return redirect(url_for('index'))
 
 
 # Import tất cả các hàm, biến và route
