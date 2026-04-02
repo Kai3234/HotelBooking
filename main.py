@@ -1,25 +1,49 @@
-from flask import Flask, render_template, request, redirect, flash, url_for, session, get_flashed_messages
-import requests
+import os
 
-# Create a flask app
+from flask import Flask, render_template, request, redirect, flash, url_for, session, get_flashed_messages, \
+    send_from_directory
+
+#ĐOẠN NÀY: Để Flask mặc định lấy CSS ở thư mục 'static'
 app = Flask(__name__)
+
 # Set the secret key for flash messages
 app.secret_key = 'FelixPham'
 
-BASE_URL = 'http://127.0.0.1:5000/'
+BASE_URL = 'http://127.0.0.1:5000'
 
+# Route này là "cứu cánh" để lấy ảnh từ thư mục images nằm ngoài static
+@app.route('/images/<path:filename>')
+def serve_images(filename):
+    # Đường dẫn trỏ thẳng vào thư mục 'images' ngang hàng với main.py
+    image_path = os.path.join(app.root_path, 'images')
+    return send_from_directory(image_path, filename)
 
 @app.route('/')
-def index():
+def main_index():
     get_flashed_messages()
-    if 'current_user' in session:
-        if session['current_user']['ChucVu'] == 'nhanvien':
-            if session['current_user']['LaAdmin'] == 1:
-                return render_template('admin/dashboard_admin.html')
-            return render_template('receptionist/dashboard_rec.html')
-        return render_template('customer/index.html')
-    return render_template('customer/index.html')
 
+    top_rooms = []
+    try:
+        # Gọi sang API cổng 5000 để lấy dữ liệu
+        response = requests.get(f"{BASE_URL}/api/top_rooms", timeout=5)
+        if response.status_code == 200:
+            top_rooms = response.json().get('data', [])
+            print(f"--- Đã lấy được {len(top_rooms)} phòng cho Trang Chủ ---")
+    except Exception as e:
+        print(f"Lỗi gọi API trang chủ: {e}")
+    # ----------------------------------------------
+
+    if 'current_user' in session:
+        user = session['current_user']
+        if user['ChucVu'] == 'nhanvien':
+            if user.get('LaAdmin') == 1:
+                return redirect(url_for('dashboard_admin'))
+            return redirect(url_for('dashboard_admin'))
+        # Truyền biến top_rooms vào đây
+        return render_template('customer/index.html', top_rooms=top_rooms)
+
+    # Truyền biến top_rooms vào đây cho khách vãng lai
+    return render_template('customer/index.html', top_rooms=top_rooms)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():

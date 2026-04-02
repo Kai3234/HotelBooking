@@ -8,10 +8,18 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles_base_customer.css') }}">
 </head>
 <body>
-    <!-- NAVBAR CHUNG -->
     <header>
         <div class="navbar">
             <a href="/" class="logo"><i class="fa-solid fa-bed"></i> RED HOTEL</a>
+
+            <form action="/rooms_list" method="GET" class="search-global-modern">
+                <div class="search-input-group">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" name="query" placeholder="Tìm kiếm phòng, dịch vụ...">
+                </div>
+                <button type="submit" class="btn-search-nav">Tìm kiếm</button>
+            </form>
+
             <ul class="nav-menu">
                 <li><a href="/">Trang chủ</a></li>
                 <li><a href="/rooms_list" class="text-red">Danh sách phòng</a></li>
@@ -22,12 +30,10 @@
 
                 {% if session.current_user %}
                 <li class="user-dropdown">
-                    <a href="#" class="btn-primary">
-                        <i class="fa-regular fa-user"></i>
-                                {{ session.current_user.HoTen }}
-
-
-                        <i class="fa-solid fa-caret-down"></i>
+                    <a href="#" class="btn-user-nav">
+                        <i class="fa-regular fa-circle-user"></i>
+                        {{ session.current_user.HoTen }}
+                        <i class="fa-solid fa-caret-down" style="font-size: 10px;"></i>
                     </a>
 
                     <ul class="dropdown-menu">
@@ -39,22 +45,99 @@
                 </li>
                 {% else %}
                 <li>
-                    <a href="/login" class="btn-primary">
-                        Đăng nhập / Đăng ký
+                    <a href="/login" class="btn-auth">
+                        <i class="fa-solid fa-right-to-bracket"></i> Đăng nhập
                     </a>
                 </li>
-
                 {% endif %}
             </ul>
         </div>
     </header>
 
-    <!-- CONTENT -->
     <div class="container">
-
         {% block content %}{% endblock %}
+    </div>
+
+    <footer style="background: #1a1a1a; color: white; padding: 70px 0 30px; margin-top: 80px; font-family: 'Segoe UI', sans-serif;">
+    <div class="footer-container" style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 40px; padding: 0 20px;">
+
+        <div class="footer-section">
+            <h3 style="color: #ff4d4d; margin-bottom: 25px; font-size: 24px; font-weight: 800;">
+                <i class="fa-solid fa-bed"></i> RED HOTEL
+            </h3>
+            <p style="line-height: 1.8; color: #adadad; font-size: 14px; margin-bottom: 20px;">
+                Hệ thống nghỉ dưỡng thuộc Hải Đăng Store. Chúng tôi mang đến không gian sống thượng lưu và dịch vụ tận tâm nhất tại Thái Bình.
+            </p>
+            <div class="social-links" style="display: flex; gap: 15px;">
+                <a href="#" style="background: #333; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: white; transition: 0.3s;"><i class="fa-brands fa-facebook-f"></i></a>
+                <a href="#" style="background: #333; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: white; transition: 0.3s;"><i class="fa-brands fa-instagram"></i></a>
+                <a href="#" style="background: #333; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: white; transition: 0.3s;"><i class="fa-brands fa-tiktok"></i></a>
+            </div>
+        </div>
+
+        <div class="footer-section">
+            <h4 style="color: white; margin-bottom: 25px; font-size: 18px; position: relative; padding-bottom: 10px;">
+                Khám Phá
+                <span style="position: absolute; bottom: 0; left: 0; width: 40px; height: 2px; background: #ff4d4d;"></span>
+            </h4>
+            <ul style="list-style: none; padding: 0;">
+                <li style="margin-bottom: 12px;"><a href="/" style="color: #adadad; transition: 0.3s; font-size: 14px;">Trang chủ</a></li>
+                <li style="margin-bottom: 12px;"><a href="/rooms_list" style="color: #adadad; transition: 0.3s; font-size: 14px;">Danh sách phòng</a></li>
+                <li style="margin-bottom: 12px;"><a href="/services" style="color: #adadad; transition: 0.3s; font-size: 14px;">Dịch vụ & Tiện ích</a></li>
+                <li style="margin-bottom: 12px;"><a href="/about" style="color: #adadad; transition: 0.3s; font-size: 14px;">Về chúng tôi</a></li>
+            </ul>
+        </div>
+
+        <div class="footer-section">
+            <h4 style="color: white; margin-bottom: 25px; font-size: 18px; position: relative; padding-bottom: 10px;">
+                Hỗ Trợ
+                <span style="position: absolute; bottom: 0; left: 0; width: 40px; height: 2px; background: #ff4d4d;"></span>
+            </h4>
+            <ul style="list-style: none; padding: 0;">
+                <li style="margin-bottom: 12px;"><a href="/profile" style="color: #adadad; transition: 0.3s; font-size: 14px;">Tài khoản cá nhân</a></li>
+                <li style="margin-bottom: 12px;"><a href="/history" style="color: #adadad; transition: 0.3s; font-size: 14px;">Lịch sử đặt phòng</a></li>
+                <li style="margin-bottom: 12px;"><a href="/policy" style="color: #adadad; transition: 0.3s; font-size: 14px;">Chính sách & Điều khoản</a></li>
+                <li style="margin-bottom: 12px;"><a href="/contact" style="color: #adadad; transition: 0.3s; font-size: 14px;">Gửi yêu cầu hỗ trợ</a></li>
+            </ul>
+        </div>
+
+        <div class="footer-section">
+            <h4 style="color: white; margin-bottom: 25px; font-size: 18px; position: relative; padding-bottom: 10px;">
+                Liên Hệ
+                <span style="position: absolute; bottom: 0; left: 0; width: 40px; height: 2px; background: #ff4d4d;"></span>
+            </h4>
+            <div style="font-size: 14px; color: #adadad;">
+                <p style="margin-bottom: 15px; display: flex; gap: 10px;">
+                    <i class="fa-solid fa-location-dot" style="color: #ff4d4d; margin-top: 5px;"></i>
+                    Hải Đăng Hotel, TP. Nam Định, Việt Nam
+                </p>
+                <p style="margin-bottom: 15px; display: flex; gap: 10px;">
+                    <i class="fa-solid fa-phone" style="color: #ff4d4d;"></i>
+                    090 123 4567
+                </p>
+                <p style="margin-bottom: 15px; display: flex; gap: 10px;">
+                    <i class="fa-solid fa-envelope" style="color: #ff4d4d;"></i>
+                    support@redhotel.vn
+                </p>
+            </div>
+            <div style="width: 100%; height: 100px; border-radius: 8px; overflow: hidden; margin-top: 15px; border: 1px solid #444;">
+                <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d119420.73030397554!2d106.28639255!3d20.446864!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3135e022069804e1%3A0x67876a4f2ca5493f!2zVGjDoWkgQsOsbmgsIFZp4buHdCBOYW0!5e0!3m2!1svi!2s!4v1711111111111!5m2!1svi!2s" width="100%" height="100%" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
+            </div>
+        </div>
 
     </div>
+
+    <div class="footer-bottom" style="text-align: center; margin-top: 60px; padding-top: 30px; border-top: 1px solid #333; font-size: 13px; color: #666;">
+        <div style="max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; flex-wrap: wrap; gap: 10px;">
+            <p>&copy; 2026 <strong>Red Hotel</strong> - Design by Hải Đăng . All rights reserved.</p>
+            <div style="display: flex; gap: 20px;">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/b/b5/PayPal.svg" alt="Paypal" height="15" style="filter: grayscale(1); opacity: 0.5;">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/0/04/Visa.svg" alt="Visa" height="15" style="filter: grayscale(1); opacity: 0.5;">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/5/5e/Mastercard-logo.svg" alt="Mastercard" height="15" style="filter: grayscale(1); opacity: 0.5;">
+            </div>
+        </div>
+    </div>
+</footer>
 
     {% block extra_js %}{% endblock %}
 </body>

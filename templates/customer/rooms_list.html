@@ -1,13 +1,284 @@
 {% extends 'layout/base_customer.html' %}
 
-{% block title %}Trang chủ{% endblock %}
-
-{% block page_title %}Trang chủ{% endblock %}
+{% block title %}Danh sách loại phòng - RED HOTEL{% endblock %}
 
 {% block content %}
-<h2>Chào mừng </h2>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<style>
+    /* 1. BỘ LỌC NÂNG CẤP (ULTRA FILTER) */
+    .filter-wrapper {
+        background: white;
+        padding: 30px;
+        border-radius: 20px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+        margin-bottom: 50px;
+        border: 1px solid #f0f0f0;
+    }
 
-<div>
-    Xem mockup/index.html để thiết kế
+    .filter-form {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        align-items: end;
+    }
+
+    .filter-item { display: flex; flex-direction: column; gap: 8px; }
+
+    .filter-item label {
+        font-size: 11px;
+        font-weight: 800;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .filter-item .form-control, .filter-item select {
+        width: 100%;
+        height: 48px;
+        border: 1.5px solid #eee;
+        border-radius: 12px;
+        padding: 0 15px;
+        background: #fafafa;
+        font-size: 14px;
+        font-weight: 600;
+        color: #333;
+        transition: 0.3s;
+        outline: none;
+    }
+
+    .filter-item .form-control:focus, .filter-item select:focus {
+        border-color: #ff4d4d;
+        background: white;
+        box-shadow: 0 0 0 4px rgba(255, 77, 77, 0.05);
+    }
+
+    .price-range-wrapper { grid-column: span 2; }
+
+    .btn-search {
+        background: #ff4d4d;
+        color: white;
+        border: none;
+        height: 48px;
+        border-radius: 12px;
+        font-weight: 800;
+        font-size: 14px;
+        cursor: pointer;
+        transition: 0.3s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        box-shadow: 0 8px 20px rgba(255, 77, 77, 0.2);
+    }
+    .btn-search:hover { background: #222; transform: translateY(-2px); }
+
+    /* 2. ROOM GRID & CARD */
+   .room-grid {
+        display: grid;
+        /* Ép nó chia 3 cột đều tăm tắp, tối thiểu 320px mỗi card */
+        grid-template-columns: repeat(3, 1fr);
+        gap: 30px;
+    }
+
+    /* Trên điện thoại thì mới cho nhảy xuống 1 hàng */
+    @media (max-width: 992px) {
+        .room-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+    @media (max-width: 600px) {
+        .room-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    .room-card {
+        background: white;
+        border-radius: 25px;
+        overflow: hidden;
+        transition: 0.4s ease;
+        border: 1px solid #f2f2f2;
+        display: flex;
+        flex-direction: column;
+    }
+    .room-card:hover {
+        transform: translateY(-12px);
+        box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+    }
+    .room-img-container { height: 250px; position: relative; overflow: hidden; }
+    .room-image { width: 100%; height: 100%; object-fit: cover; transition: 0.6s; }
+    .room-card:hover .room-image { transform: scale(1.1); }
+
+    .price-tag {
+        position: absolute; top: 20px; right: 20px;
+        background: rgba(255, 255, 255, 0.95);
+        color: #ff4d4d; padding: 8px 15px; border-radius: 12px;
+        font-weight: 900; font-size: 1.1rem; box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+
+    .room-info { padding: 30px; flex-grow: 1; display: flex; flex-direction: column; }
+    .room-title { font-size: 1.6rem; margin-bottom: 12px; color: #1a1a1a; font-weight: 800; }
+    .room-meta { display: flex; gap: 15px; color: #777; font-size: 13px; margin-bottom: 25px; }
+    .room-meta span i { color: #ff4d4d; margin-right: 5px; }
+
+    .btn-group { display: flex; gap: 12px; margin-top: auto; }
+    .btn-main {
+        flex: 2; background: #222; color: white; text-align: center;
+        padding: 14px; border-radius: 12px; text-decoration: none; font-weight: 700; transition: 0.3s;
+    }
+    .btn-main:hover { background: #ff4d4d; }
+    .btn-sub {
+        flex: 1; background: #f5f5f5; color: #333; text-align: center;
+        padding: 14px; border-radius: 12px; text-decoration: none; font-weight: 700;
+    }
+</style>
+
+<div class="container" style="max-width: 1200px; margin: 60px auto; padding: 0 20px;">
+
+    <section class="filter-wrapper">
+        <form action="/rooms_list" method="GET" class="filter-form">
+            <div class="filter-item">
+                <label><i class="fa-solid fa-calendar-day"></i> Ngày nhận</label>
+                <input type="text" id="checkin" name="checkin" class="form-control" value="{{ request.args.get('checkin', '') }}" placeholder="dd/mm/yyyy">
+            </div>
+            <div class="filter-item">
+                <label><i class="fa-solid fa-calendar-check"></i> Ngày trả</label>
+                <input type="text" id="checkout" name="checkout" class="form-control" value="{{ request.args.get('checkout', '') }}" placeholder="dd/mm/yyyy">
+            </div>
+
+            <div class="filter-item">
+                <label><i class="fa-solid fa-hotel"></i> Loại phòng</label>
+                <select name="room_type">
+                    <option value="">Tất cả loại phòng</option>
+                    <option value="standard" {{ 'selected' if request.args.get('room_type') == 'standard' }}>Standard (Tiêu chuẩn)</option>
+                    <option value="deluxe" {{ 'selected' if request.args.get('room_type') == 'deluxe' }}>Deluxe (Sang trọng)</option>
+                    <option value="suite" {{ 'selected' if request.args.get('room_type') == 'suite' }}>Suite (Cao cấp nhất)</option>
+                </select>
+            </div>
+
+            <div class="filter-item">
+                <label><i class="fa-solid fa-bed"></i> Số giường</label>
+                <select name="beds">
+                    <option value="">Bất kỳ</option>
+                    <option value="1" {{ 'selected' if request.args.get('beds') == '1' }}>1 Giường lớn</option>
+                    <option value="2" {{ 'selected' if request.args.get('beds') == '2' }}>2 Giường đơn</option>
+                    <option value="3" {{ 'selected' if request.args.get('beds') == '3' }}>Phòng gia đình</option>
+                </select>
+            </div>
+
+            <div class="filter-item price-range-wrapper">
+                <div style="display: flex; justify-content: space-between;">
+                    <label><i class="fa-solid fa-money-bill-wave"></i> Giá tối đa</label>
+                    <span style="font-weight: 800; color: #ff4d4d;"><span id="priceValue">{{ "{:,.0f}".format(request.args.get('max_price', 5000000)|int) }}</span>đ</span>
+                </div>
+                <input type="range" name="max_price" min="500000" max="10000000" step="100000"
+                       value="{{ request.args.get('max_price', 5000000) }}"
+                       oninput="document.getElementById('priceValue').innerText = Number(this.value).toLocaleString()">
+            </div>
+
+            <button type="submit" class="btn-search">
+                <i class="fa-solid fa-filter"></i> LỌC KẾT QUẢ
+            </button>
+        </form>
+    </section>
+
+    <div class="room-grid">
+        {% for room in loaiphong_list %}
+        <div class="room-card">
+            <div class="room-img-container">
+                <img src="{{ room['HinhAnhDaiDien'] if room['HinhAnhDaiDien'] else 'https://via.placeholder.com/400x250' }}" class="room-image" alt="{{ room['TenLoai'] }}">
+                <div class="price-tag">{{ "{:,.0f}".format(room['GiaTien']) }}đ</div>
+            </div>
+            <div class="room-info">
+                <h3 class="room-title">{{ room['TenLoai'] }}</h3>
+                <div class="room-meta">
+                    <span><i class="fa-solid fa-users"></i> {{ room['SoNguoiToiDa'] }} Khách</span>
+                    <span><i class="fa-solid fa-expand"></i> 35m²</span>
+                    <span><i class="fa-solid fa-wifi"></i> Free</span>
+                </div>
+
+                <div class="btn-group">
+                    <a href="/rooms_detail/{{ room['MaLoai'] }}" class="btn-sub">Chi tiết</a>
+                    {% if room['SoLuongTrong'] > 0 or not request.args.get('checkin') %}
+                    <form action="/add_to_cart" method="POST" style="flex: 2; display: flex;">
+                        <input type="hidden" name="ma_loai" value="{{ room['MaLoai'] }}">
+                        <button type="submit" class="btn-main" style="border: none; width: 100%; cursor: pointer;">
+                            ĐẶT NGAY
+                        </button>
+                    </form>
+                    {% else %}
+                    <button class="btn-main" style="background: #ccc; cursor: not-allowed;" disabled>HẾT PHÒNG</button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        <div class="room-card" style="opacity: 0.9;">
+            <div class="room-img-container">
+                <img src="/images/rooms/standard_1.jpg" class="room-image" alt="Standard">
+                <div class="price-tag">850,000đ</div>
+                <div style="position: absolute; top: 20px; left: 20px; background: #333; color: white; padding: 5px 12px; border-radius: 6px; font-size: 10px; font-weight: bold;">GỢI Ý</div>
+            </div>
+            <div class="room-info">
+                <h3 class="room-title">Standard Garden View</h3>
+                <div class="room-meta">
+                    <span><i class="fa-solid fa-users"></i> 2 Khách</span>
+                    <span><i class="fa-solid fa-bed"></i> 1 Giường đôi</span>
+                </div>
+                <div class="btn-group">
+                    <a href="#" class="btn-sub">Chi tiết</a>
+                    <a href="#" class="btn-main">ĐẶT NGAY</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="room-card" style="opacity: 0.9;">
+            <div class="room-img-container">
+                <img src="/images/rooms/deluxe_1.jpg" class="room-image" alt="Deluxe">
+                <div class="price-tag">1,450,000đ</div>
+                <div style="position: absolute; top: 20px; left: 20px; background: #333; color: white; padding: 5px 12px; border-radius: 6px; font-size: 10px; font-weight: bold;">GỢI Ý</div>
+            </div>
+            <div class="room-info">
+                <h3 class="room-title">Deluxe Ocean Front</h3>
+                <div class="room-meta">
+                    <span><i class="fa-solid fa-users"></i> 2 Khách</span>
+                    <span><i class="fa-solid fa-bed"></i> 1 Giường King</span>
+                </div>
+                <div class="btn-group">
+                    <a href="#" class="btn-sub">Chi tiết</a>
+                    <a href="#" class="btn-main">ĐẶT NGAY</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="room-card" style="opacity: 0.9;">
+            <div class="room-img-container">
+                <img src="/images/rooms/suite_1.jpg" class="room-image" alt="Suite">
+                <div class="price-tag">3,200,000đ</div>
+                <div style="position: absolute; top: 20px; left: 20px; background: #333; color: white; padding: 5px 12px; border-radius: 6px; font-size: 10px; font-weight: bold;">GỢI Ý</div>
+            </div>
+            <div class="room-info">
+                <h3 class="room-title">Presidential Suite</h3>
+                <div class="room-meta">
+                    <span><i class="fa-solid fa-users"></i> 4 Khách</span>
+                    <span><i class="fa-solid fa-bed"></i> 2 Giường King</span>
+                </div>
+                <div class="btn-group">
+                    <a href="#" class="btn-sub">Chi tiết</a>
+                    <a href="#" class="btn-main">ĐẶT NGAY</a>
+                </div>
+            </div>
+        </div>
+
+    </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const config = { dateFormat: "d/m/Y", minDate: "today" };
+        flatpickr("#checkin", config);
+        flatpickr("#checkout", config);
+    });
+</script>
 {% endblock %}

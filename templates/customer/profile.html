@@ -1,13 +1,238 @@
 {% extends 'layout/base_customer.html' %}
 
-{% block title %}Trang chủ{% endblock %}
-
-{% block page_title %}Trang chủ{% endblock %}
+{% block title %}Hồ sơ cá nhân - RED HOTEL{% endblock %}
 
 {% block content %}
-<h2>Chào mừng </h2>
+<style>
+    :root {
+        --primary-red: #ff4d4d;
+        --dark-bg: #1a1a1a;
+        --glass-bg: rgba(255, 255, 255, 0.03);
+    }
 
-<div>
-    Xem mockup/index.html để thiết kế
+    .profile-container {
+        max-width: 1100px;
+        margin: 50px auto;
+        padding: 0 20px;
+    }
+
+    /* 1. LAYOUT CHIA CỘT HIỆN ĐẠI */
+    .profile-layout {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: 40px;
+        align-items: start;
+    }
+
+    /* 2. SIDEBAR CỰC CHẤT */
+    .profile-sidebar {
+        background: white;
+        padding: 40px 30px;
+        border-radius: 30px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.05);
+        text-align: center;
+        border: 1px solid #f0f0f0;
+    }
+
+    .avatar-wrapper {
+        position: relative;
+        width: 140px;
+        height: 140px;
+        margin: 0 auto 25px;
+    }
+
+    .avatar-placeholder {
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, var(--primary-red), #b31217);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3.5rem;
+        color: white;
+        font-weight: 800;
+        box-shadow: 0 15px 30px rgba(255, 77, 77, 0.3);
+    }
+
+    .status-indicator {
+        position: absolute;
+        bottom: 5px;
+        right: 5px;
+        width: 25px;
+        height: 25px;
+        background: #2ecc71;
+        border: 4px solid white;
+        border-radius: 50%;
+    }
+
+    .sidebar-nav {
+        margin-top: 35px;
+        text-align: left;
+    }
+
+    .nav-btn {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 15px 20px;
+        border-radius: 15px;
+        color: #666;
+        text-decoration: none;
+        font-weight: 700;
+        transition: 0.3s;
+        margin-bottom: 10px;
+    }
+
+    .nav-btn:hover, .nav-btn.active {
+        background: #fff5f5;
+        color: var(--primary-red);
+    }
+
+    /* 3. FORM NHẬP LIỆU SẮC XẢO */
+    .profile-main {
+        background: white;
+        padding: 45px;
+        border-radius: 30px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.05);
+        border: 1px solid #f0f0f0;
+    }
+
+    .form-section-title {
+        font-size: 1.5rem;
+        font-weight: 800;
+        margin-bottom: 30px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: #222;
+    }
+
+    .form-label {
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        color: #999;
+        margin-bottom: 10px;
+        display: block;
+        letter-spacing: 1px;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 16px;
+        border: 2px solid #f7f7f7;
+        border-radius: 15px;
+        background: #fafafa;
+        font-weight: 600;
+        transition: 0.3s;
+        outline: none;
+    }
+
+    .form-control:focus {
+        border-color: var(--primary-red);
+        background: white;
+        box-shadow: 0 0 0 4px rgba(255, 77, 77, 0.05);
+    }
+
+    .btn-save {
+        background: var(--primary-red);
+        color: white;
+        padding: 16px 35px;
+        border-radius: 15px;
+        border: none;
+        font-weight: 800;
+        cursor: pointer;
+        transition: 0.3s;
+        box-shadow: 0 10px 20px rgba(255, 77, 77, 0.2);
+    }
+
+    .btn-save:hover { background: #222; transform: translateY(-3px); }
+
+    /* 4. DANGER ZONE (KHU VỰC NGUY HIỂM) */
+    .danger-zone {
+        margin-top: 50px;
+        padding: 30px;
+        background: #fffafa;
+        border-radius: 20px;
+        border: 1px dashed #ffcccc;
+    }
+</style>
+
+<div class="profile-container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div style="padding: 15px; border-radius: 12px; margin-bottom: 30px; background: {% if category == 'success' %}#e6fffa; color: #38b2ac;{% else %}#fff5f5; color: #e53e3e;{% endif %}; font-weight: 700;">
+            <i class="fa-solid fa-circle-info"></i> {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="profile-layout">
+        <aside class="profile-sidebar">
+            <div class="avatar-wrapper">
+                <div class="avatar-placeholder">
+                    {{ session.current_user.HoTen[0] | upper }}
+                </div>
+                <div class="status-indicator"></div>
+            </div>
+            <h3 style="font-weight: 800; margin-bottom: 5px;">{{ session.current_user.HoTen }}</h3>
+            <p style="color: #aaa; font-size: 13px;">Thành viên từ 2025</p>
+
+            <div class="sidebar-nav">
+                <a href="/profile" class="nav-btn active"><i class="fa-solid fa-user-pen"></i> Thông tin cá nhân</a>
+                <a href="/history" class="nav-btn"><i class="fa-solid fa-clock-rotate-left"></i> Lịch sử đặt phòng</a>
+                <a href="/logout" class="nav-btn" style="color: #ff4d4d;"><i class="fa-solid fa-power-off"></i> Đăng xuất</a>
+            </div>
+        </aside>
+
+        <div class="profile-main">
+            <form action="/update_profile" method="POST">
+                <h4 class="form-section-title"><i class="fa-solid fa-address-card" style="color: var(--primary-red);"></i> Cài đặt tài khoản</h4>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px;">
+                    <div class="form-group">
+                        <label class="form-label">Họ và Tên</label>
+                        <input type="text" name="ho_ten" class="form-control" value="{{ session.current_user.HoTen }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Số điện thoại</label>
+                        <input type="tel" name="sdt" class="form-control" value="{{ session.current_user.SDT }}" required>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 25px;">
+                    <label class="form-label">Email đăng nhập</label>
+                    <input type="email" class="form-control" value="{{ session.current_user.Email }}" readonly style="background: #f0f0f0; color: #888; cursor: not-allowed;">
+                    <p style="font-size: 12px; color: #bbb; margin-top: 8px;"><i class="fa-solid fa-lock"></i> Email là định danh duy nhất và không thể thay đổi.</p>
+                </div>
+
+                <div style="margin-top: 40px; padding-top: 30px; border-top: 1px solid #f0f0f0;">
+                    <h4 class="form-section-title" style="font-size: 1.2rem;"><i class="fa-solid fa-key" style="color: var(--primary-red);"></i> Bảo mật</h4>
+                    <div class="form-group">
+                        <label class="form-label">Mật khẩu mới</label>
+                        <input type="password" name="new_password" class="form-control" placeholder="Để trống nếu không muốn thay đổi">
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 15px; margin-top: 40px;">
+                    <button type="submit" class="btn-save">CẬP NHẬT HỒ SƠ</button>
+                    <button type="reset" style="background: #eee; color: #666; border: none; padding: 16px 25px; border-radius: 15px; font-weight: 700; cursor: pointer;">Hủy bỏ</button>
+                </div>
+            </form>
+
+            <div class="danger-zone">
+                <h5 style="color: #ff4d4d; font-weight: 800; margin-bottom: 10px;">Vô hiệu hóa tài khoản</h5>
+                <p style="font-size: 13px; color: #888; line-height: 1.5;">Lưu ý: Mọi lịch sử đặt phòng và ưu đãi thành viên sẽ bị mất vĩnh viễn. Hành động này không thể hoàn tác.</p>
+                <form action="/deactivate_account" method="POST" onsubmit="return confirm('Mày có chắc chắn muốn xóa sổ cái tài khoản này không?')">
+                    <button type="submit" style="background: none; border: 1.5px solid #ffcccc; color: #ff4d4d; padding: 10px 20px; border-radius: 10px; font-weight: 700; cursor: pointer; margin-top: 15px; transition: 0.3s;" onmouseover="this.style.background='#ff4d4d'; this.style.color='white'">
+                        Khóa tài khoản ngay
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

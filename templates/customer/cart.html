@@ -1,13 +1,263 @@
 {% extends 'layout/base_customer.html' %}
 
-{% block title %}Trang chủ{% endblock %}
-
-{% block page_title %}Trang chủ{% endblock %}
+{% block title %}Giỏ hàng & Thanh toán - RED HOTEL{% endblock %}
 
 {% block content %}
-<h2>Chào mừng </h2>
+<style>
+    /* 1. PROGRESS STEPS NÂNG CẤP */
+    .booking-steps {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 20px;
+        margin-bottom: 50px;
+        padding: 20px;
+        background: white;
+        border-radius: 50px;
+        box-shadow: var(--shadow);
+    }
+    .step {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        color: #ccc;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .step.active { color: var(--primary-red); }
+    .step i { font-size: 18px; }
+    .step-divider { color: #eee; font-size: 12px; }
 
-<div>
-    Xem mockup/index.html để thiết kế
+    /* 2. CART ITEM CARD SANG CHẢNH */
+    .cart-item-card {
+        background: white;
+        border: none !important;
+        border-radius: 20px;
+        padding: 25px;
+        margin-bottom: 25px;
+        box-shadow: var(--shadow);
+        transition: 0.3s;
+        position: relative;
+        overflow: hidden;
+    }
+    .cart-item-card:hover { transform: translateX(10px); box-shadow: var(--shadow-hover); }
+    .cart-item-card::before {
+        content: '';
+        position: absolute;
+        left: 0; top: 0; bottom: 0;
+        width: 6px;
+        background: var(--primary-red);
+    }
+
+    .item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .item-header h4 { font-size: 1.4rem; font-weight: 800; color: #222; }
+
+    .item-details { display: flex; gap: 20px; margin: 15px 0; color: #666; font-size: 14px; }
+    .item-details span i { color: var(--primary-red); margin-right: 5px; }
+
+    .item-services {
+        background: #fdf2f2;
+        padding: 20px;
+        border-radius: 15px;
+        margin-top: 20px;
+        border: 1px dashed rgba(200, 16, 46, 0.2);
+    }
+    .service-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+        font-size: 14px;
+        color: #444;
+    }
+    .service-row:last-child { border-bottom: none; }
+
+    /* 3. SUMMARY SIDEBAR & FORM CONTROL */
+    .cart-summary {
+        background: white;
+        padding: 30px;
+        border-radius: 25px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        position: sticky;
+        top: 100px;
+        height: fit-content;
+    }
+
+    .cart-summary .form-label {
+        font-size: 13px;
+        font-weight: 800;
+        color: #555;
+        text-transform: uppercase;
+        margin-bottom: 10px;
+        display: block;
+        letter-spacing: 0.5px;
+    }
+
+    .cart-summary .form-control {
+        width: 100%;
+        padding: 15px;
+        border: 2px solid #f0f0f0;
+        border-radius: 12px;
+        font-size: 14px;
+        color: #333;
+        background-color: #fafafa;
+        transition: all 0.3s ease;
+        outline: none;
+        resize: none;
+    }
+
+    .cart-summary .form-control:focus {
+        background-color: #ffffff;
+        border-color: var(--primary-red);
+        box-shadow: 0 0 0 4px rgba(200, 16, 46, 0.08);
+        transform: translateY(-2px);
+    }
+
+    .summary-box {
+        background: linear-gradient(135deg, #fffafa, #fff0f0);
+        padding: 25px;
+        border-radius: 20px;
+        margin: 25px 0;
+        border: 1px solid #ffebeb;
+    }
+
+    .total-row {
+        display: flex;
+        justify-content: space-between;
+        font-weight: 900;
+        font-size: 22px;
+        color: var(--primary-red);
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 2px dashed #ffcccc;
+    }
+
+    .btn-confirm {
+        background: var(--primary-red);
+        color: white;
+        width: 100%;
+        padding: 18px;
+        border: none;
+        border-radius: 15px;
+        font-weight: 800;
+        font-size: 16px;
+        cursor: pointer;
+        transition: 0.3s;
+        box-shadow: 0 10px 20px rgba(200, 16, 46, 0.2);
+    }
+    .btn-confirm:hover { background: #222; transform: translateY(-3px); }
+</style>
+
+<div class="container" style="max-width: 1200px; margin: 50px auto;">
+    <div class="booking-steps">
+        <div class="step active"><i class="fa-solid fa-circle-1"></i> Giỏ hàng</div>
+        <div class="step-divider"><i class="fa-solid fa-chevron-right"></i></div>
+        <div class="step"><i class="fa-solid fa-circle-2"></i> Xác nhận</div>
+        <div class="step-divider"><i class="fa-solid fa-chevron-right"></i></div>
+        <div class="step"><i class="fa-solid fa-circle-3"></i> Hoàn tất</div>
+    </div>
+
+    <form action="/confirm_booking" method="POST">
+        <div style="display: grid; grid-template-columns: 1.8fr 1.2fr; gap: 40px;">
+
+            <div class="cart-left">
+                <h2 style="font-weight: 800; margin-bottom: 30px; display: flex; align-items: center; gap: 15px;">
+                    <i class="fa-solid fa-bed" style="color: var(--primary-red);"></i> Danh sách lựa chọn
+                </h2>
+
+                {% if session.cart %}
+                    {% for item in session.cart %}
+                    <div class="cart-item-card">
+                        <div class="item-header">
+                            <h4>{{ item.TenLoai }}</h4>
+                            <a href="/remove_from_cart/{{ loop.index0 }}" style="color: #ff4d4d; font-size: 13px; font-weight: 700; text-decoration: none;">
+                                <i class="fa-solid fa-trash-can"></i> GỠ BỎ
+                            </a>
+                        </div>
+
+                        <div class="item-details">
+                            <span><i class="fa-regular fa-calendar-check"></i> {{ item.checkin }} - {{ item.checkout }}</span>
+                            <span><i class="fa-solid fa-tag"></i> {{ "{:,.0f}".format(item.GiaTien) }}đ / đêm</span>
+                        </div>
+
+                        <div class="item-services">
+                            <h5 style="margin-bottom: 15px; font-weight: 800; color: #444; font-size: 14px; text-transform: uppercase;">
+                                <i class="fa-solid fa-concierge-bell"></i> Dịch vụ yêu cầu
+                            </h5>
+                            {% if item.services %}
+                                {% for sv in item.services %}
+                                <div class="service-row">
+                                    <span>{{ sv.TenDV }} <small style="color: #888;">(x{{ sv.SoLuong }})</small></span>
+                                    <span style="font-weight: 700;">{{ "{:,.0f}".format(sv.GiaTien * sv.SoLuong) }}đ</span>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <p style="font-size: 13px; color: #999; font-style: italic; margin-bottom: 10px;">Bạn chưa chọn dịch vụ nào cho phòng này.</p>
+                            {% endif %}
+
+                            <a href="/services?item_index={{ loop.index0 }}" class="btn-outline" style="display: inline-block; padding: 8px 15px; border-radius: 8px; font-size: 12px; margin-top: 10px; border: 1.5px solid var(--primary-red); color: var(--primary-red); font-weight: 700; text-decoration: none; transition: 0.3s;">
+                                <i class="fa-solid fa-plus-circle"></i> THÊM DỊCH VỤ NGAY
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div style="text-align: center; padding: 60px; background: white; border-radius: 25px; box-shadow: var(--shadow);">
+                        <img src="https://cdn-icons-png.flaticon.com/512/11329/11329061.png" style="width: 120px; opacity: 0.3; margin-bottom: 20px;">
+                        <h3 style="color: #888;">Giỏ hàng của mày đang trống!</h3>
+                        <a href="/rooms_list" class="btn btn-primary" style="margin-top: 20px; display: inline-block; padding: 12px 25px; border-radius: 10px; background: var(--primary-red); color: white; text-decoration: none; font-weight: bold;">Quay lại đặt phòng</a>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="cart-right">
+                <div class="cart-summary">
+                    <h3 style="font-weight: 800; margin-bottom: 25px; border-bottom: 2px solid #f0f0f0; padding-bottom: 15px;">Chi tiết hóa đơn</h3>
+
+                    <div class="form-group">
+                        <label class="form-label">Người đặt phòng</label>
+                        <div style="background: #f9f9f9; padding: 12px 15px; border-radius: 12px; font-weight: 700; color: #333; border: 2px solid #eee; display: flex; align-items: center;">
+                            <i class="fa-solid fa-user-circle" style="color: var(--primary-red); margin-right: 10px; font-size: 20px;"></i>
+                            {{ session.current_user.HoTen }}
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 25px;">
+                        <label class="form-label">
+                            <i class="fa-solid fa-pen-nib" style="margin-right: 5px; color: var(--primary-red);"></i>
+                            Yêu cầu đặc biệt
+                        </label>
+                        <textarea class="form-control" name="ghi_chu" rows="4"
+                                  placeholder="Ví dụ: Lấy phòng hướng biển, tầng cao, check-in muộn..."></textarea>
+                    </div>
+
+                    <div class="summary-box">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px; color: #666;">
+                            <span>Tiền phòng:</span>
+                            <span style="font-weight: 600; color: #222;">{{ "{:,.0f}".format(tong_tien_phong) }}đ</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px; color: #666;">
+                            <span>Tiền dịch vụ:</span>
+                            <span style="font-weight: 600; color: #222;">{{ "{:,.0f}".format(tong_tien_dichvu) }}đ</span>
+                        </div>
+                        <div class="total-row">
+                            <span>TỔNG CỘNG</span>
+                            <span>{{ "{:,.0f}".format(tong_tien_phong + tong_tien_dichvu) }}đ</span>
+                        </div>
+                    </div>
+
+                    <a href="/checkout" style="background: #ff4d4d; color: white; padding: 15px 40px; border-radius: 10px; text-decoration: none; font-weight: 800; font-size: 1.2rem; display: inline-block;">
+        TIẾN HÀNH XÁC NHẬN <i class="fa-solid fa-arrow-right"></i>
+    </a>
+
+                    <p style="text-align: center; font-size: 12px; color: #999; margin-top: 20px;">
+                        <i class="fa-solid fa-shield-halved"></i> Thanh toán an toàn & bảo mật
+                    </p>
+                </div>
+            </div>
+        </div>
+    </form>
 </div>
 {% endblock %}

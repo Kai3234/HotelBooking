@@ -1,13 +1,211 @@
 {% extends 'layout/base_customer.html' %}
 
-{% block title %}Trang chủ{% endblock %}
-
-{% block page_title %}Trang chủ{% endblock %}
+{% block title %}Chi tiết {{ room.TenLoai }} - RED HOTEL{% endblock %}
 
 {% block content %}
-<h2>Chào mừng </h2>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
-<div>
-    Xem mockup/index.html để thiết kế
+<style>
+    .room-detail-wrapper {
+        max-width: 1200px;
+        margin: 40px auto;
+        padding: 0 20px;
+    }
+
+    /* 1. GALLERY SẮC XẢO */
+    .gallery-container {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 15px;
+        height: 500px;
+        margin-bottom: 40px;
+        border-radius: 20px;
+        overflow: hidden;
+    }
+    .main-img-box {
+        width: 100%;
+        height: 100%;
+        position: relative;
+    }
+    .main-img-box img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: 0.5s;
+    }
+    .sub-img-grid {
+        display: grid;
+        grid-template-rows: 1fr 1fr;
+        gap: 15px;
+    }
+    .sub-img-box {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+    }
+    .sub-img-box img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        cursor: pointer;
+        transition: 0.3s;
+    }
+    .sub-img-box img:hover { transform: scale(1.05); filter: brightness(0.8); }
+
+    /* 2. BOOKING CARD GLASSMORPHISM */
+    .booking-card {
+        background: white;
+        padding: 35px;
+        border-radius: 25px;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.08);
+        border: 1px solid #f0f0f0;
+        position: sticky;
+        top: 100px;
+    }
+    .price-big {
+        font-size: 2.2rem;
+        font-weight: 900;
+        color: #ff4d4d;
+        display: block;
+        margin-bottom: 5px;
+    }
+    .form-label-custom {
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        color: #888;
+        display: block;
+        margin-bottom: 8px;
+        letter-spacing: 1px;
+    }
+    .input-date-custom {
+        width: 100%;
+        padding: 15px;
+        border: 2px solid #f7f7f7;
+        border-radius: 12px;
+        background: #fafafa;
+        font-weight: 600;
+        margin-bottom: 20px;
+        outline: none;
+        transition: 0.3s;
+    }
+    .input-date-custom:focus { border-color: #ff4d4d; background: white; }
+
+    /* 3. AMENITIES (TIỆN NGHI) */
+    .amenity-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 15px;
+        background: #fdfdfd;
+        border-radius: 12px;
+        border: 1px solid #f0f0f0;
+        font-weight: 600;
+        color: #444;
+    }
+    .amenity-item i { color: #ff4d4d; font-size: 1.2rem; }
+
+    .btn-book-now {
+        background: #222;
+        color: white;
+        width: 100%;
+        padding: 20px;
+        border-radius: 15px;
+        border: none;
+        font-weight: 800;
+        font-size: 1.1rem;
+        cursor: pointer;
+        transition: 0.3s;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    .btn-book-now:hover { background: #ff4d4d; transform: translateY(-3px); }
+</style>
+
+<div class="room-detail-wrapper">
+    <a href="/rooms_list" style="display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: #666; font-weight: 700; margin-bottom: 30px; transition: 0.3s;" onmouseover="this.style.color='#ff4d4d'" onmouseout="this.style.color='#666'">
+        <i class="fa-solid fa-chevron-left"></i> QUAY LẠI DANH SÁCH
+    </a>
+
+    <div class="gallery-container">
+        <div class="main-img-box">
+            <img src="{{ room.HinhAnhDaiDien if room.HinhAnhDaiDien.startswith('http') else '/' + room.HinhAnhDaiDien }}" id="main-view">
+        </div>
+        <div class="sub-img-grid">
+            {% for img in room.DanhSachAnh[:2] %}
+            <div class="sub-img-box">
+                <img src="{{ img.HinhAnh if img.HinhAnh.startswith('http') else '/' + img.HinhAnh }}" onclick="document.getElementById('main-view').src=this.src">
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1.8fr 1.2fr; gap: 50px;">
+        <div class="detail-content">
+            <h1 style="font-size: 3rem; font-weight: 900; color: #1a1a1a; margin-bottom: 10px;">{{ room.TenLoai }}</h1>
+            <p style="color: #888; font-size: 1.1rem; margin-bottom: 30px;">
+                <i class="fa-solid fa-location-dot"></i> Khu vực VIP - Hải Đăng Store Hotel
+            </p>
+
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 40px;">
+                <div class="amenity-item"><i class="fa-solid fa-users"></i> {{ room.SoNguoiToiDa }} Khách</div>
+                <div class="amenity-item"><i class="fa-solid fa-expand"></i> 45m²</div>
+                <div class="amenity-item"><i class="fa-solid fa-wifi"></i> Free Wifi</div>
+            </div>
+
+            <h3 style="font-weight: 800; margin-bottom: 20px; border-left: 5px solid #ff4d4d; padding-left: 15px;">Chi tiết phòng</h3>
+            <p style="line-height: 1.8; color: #555; font-size: 1.1rem; white-space: pre-line; margin-bottom: 40px;">
+                {{ room.MoTa }}
+            </p>
+
+            <h3 style="font-weight: 800; margin-bottom: 20px;">Dịch vụ đi kèm</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; color: #666;">
+                <div><i class="fa-solid fa-check" style="color: #2ecc71;"></i> Ăn sáng buffet miễn phí</div>
+                <div><i class="fa-solid fa-check" style="color: #2ecc71;"></i> Nước suối & Trái cây đón khách</div>
+                <div><i class="fa-solid fa-check" style="color: #2ecc71;"></i> Dọn phòng mỗi ngày</div>
+                <div><i class="fa-solid fa-check" style="color: #2ecc71;"></i> Sử dụng hồ bơi & Gym</div>
+            </div>
+        </div>
+
+        <div class="detail-sidebar">
+            <div class="booking-card">
+                <div style="margin-bottom: 30px;">
+                    <span class="price-big">{{ "{:,.0f}".format(room.GiaTien) }}đ</span>
+                    <span style="color: #aaa; font-weight: 600;">/ Một đêm nghỉ tại thiên đường</span>
+                </div>
+
+                <form action="/add_to_cart" method="POST">
+                    <input type="hidden" name="ma_loai" value="{{ room.MaLoai }}">
+
+                    <label class="form-label-custom">Ngày nhận phòng</label>
+                    <input type="text" id="checkin" name="checkin" class="input-date-custom" placeholder="Chọn ngày đi" required>
+
+                    <label class="form-label-custom">Ngày trả phòng</label>
+                    <input type="text" id="checkout" name="checkout" class="input-date-custom" placeholder="Chọn ngày về" required>
+
+                    <button type="submit" class="btn-book-now">
+                        ĐẶT PHÒNG NGAY <i class="fa-solid fa-arrow-right" style="margin-left: 10px;"></i>
+                    </button>
+                </form>
+
+                <div style="margin-top: 25px; text-align: center; color: #bbb; font-size: 13px;">
+                    <p><i class="fa-solid fa-shield-check"></i> Thanh toán an toàn 100%</p>
+                    <p>Không mất phí hủy phòng trước 24h</p>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const fpConfig = {
+            dateFormat: "d/m/Y",
+            minDate: "today",
+            animate: true
+        };
+        flatpickr("#checkin", fpConfig);
+        flatpickr("#checkout", fpConfig);
+    });
+</script>
 {% endblock %}
