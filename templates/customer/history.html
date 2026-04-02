@@ -3,59 +3,74 @@
 {% block title %}Lịch sử đặt phòng - RED HOTEL{% endblock %}
 
 {% block content %}
+<style>
+    .history-container { max-width: 1100px; margin: 50px auto; padding: 0 20px; }
+    .guide-title { font-weight: 800; font-size: 2rem; margin-bottom: 30px; color: #222; }
+    .booking-card { background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.05); margin-bottom: 40px; border: 1px solid #eee; }
+    .badge-red { background: #fff5f5; color: #ff4d4d; padding: 5px 12px; border-radius: 6px; font-weight: 700; font-size: 12px; }
+    .badge-success { background: #f6ffed; color: #52c41a; padding: 5px 12px; border-radius: 6px; font-weight: 700; font-size: 12px; }
+    .badge-gray { background: #f5f5f5; color: #888; padding: 5px 12px; border-radius: 6px; font-weight: 700; font-size: 12px; }
+    .btn-outline { border: 1px solid #ff4d4d; color: #ff4d4d; background: transparent; padding: 8px 20px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: 0.3s; }
+    .btn-outline:hover { background: #ff4d4d; color: white; }
+</style>
+
 <div class="history-container">
-    <h2 class="guide-title"><i class="fa-solid fa-clock-rotate-left"></i> Lịch sử đặt phòng của bạn</h2>
+    <h2 class="guide-title"><i class="fa-solid fa-clock-rotate-left" style="color: #ff4d4d;"></i> Lịch sử đặt phòng của bạn</h2>
 
     {% if lich_su_dat %}
         {% for dp in lich_su_dat %}
-        <div class="booking-card" style="border: 1px solid #eee; margin-bottom: 30px; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
-
-            <div class="booking-header" style="background: #f8f9fa; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;">
+        <div class="booking-card">
+            <div class="booking-header" style="background: #fafafa; padding: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee;">
                 <div>
-                    <span style="font-weight: bold; color: #555;">Mã đơn: #{{ dp.MaDP }}</span>
-                    <span style="margin-left: 15px; color: #888;">Ngày đặt: {{ dp.NgayTao }}</span>
+                    <span style="font-weight: 800; font-size: 1.1rem; color: #333;">Mã đơn: #{{ dp['MaDP'] }}</span>
+                    <span style="margin-left: 20px; color: #888; font-size: 14px;"><i class="fa-regular fa-calendar"></i> {{ dp['NgayTao'] }}</span>
                 </div>
                 <div>
-                    {% if dp.TrangThai == 'Chờ xác nhận' %}
-                        <span class="badge badge-red">{{ dp.TrangThai }}</span>
-                    {% elif dp.TrangThai == 'Hoàn tất' %}
-                        <span class="badge badge-success">{{ dp.TrangThai }}</span>
+                    {% if dp['TrangThai'] == 'Chờ xác nhận' %}
+                        <span class="badge badge-red">{{ dp['TrangThai'] }}</span>
+                    {% elif dp['TrangThai'] == 'Hoàn tất' %}
+                        <span class="badge badge-success">{{ dp['TrangThai'] }}</span>
                     {% else %}
-                        <span class="badge badge-gray">{{ dp.TrangThai }}</span>
+                        <span class="badge badge-gray">{{ dp['TrangThai'] }}</span>
                     {% endif %}
                 </div>
             </div>
 
-            <div class="booking-body" style="padding: 20px;">
+            <div class="booking-body" style="padding: 0 20px;">
                 <table style="width: 100%; border-collapse: collapse;">
                     <thead>
-                        <tr style="text-align: left; border-bottom: 2px solid #eee; color: #777; font-size: 14px;">
-                            <th style="padding: 10px 0;">Loại phòng / Số phòng</th>
+                        <tr style="text-align: left; border-bottom: 2px solid #f5f5f5; color: #aaa; font-size: 12px; text-transform: uppercase;">
+                            <th style="padding: 15px 0;">Phòng</th>
                             <th>Thời gian lưu trú</th>
                             <th>Giá phòng</th>
-                            <th>Dịch vụ đã đặt</th>
+                            <th>Dịch vụ đính kèm</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for ct in dp.DanhSachChiTiet %}
-                        <tr style="border-bottom: 1px solid #eee;">
-                            <td style="padding: 15px 0;">
-                                <strong>{{ ct.TenLoai }}</strong><br>
-                                <small style="color: #ff4d4d;">Số phòng: {{ ct.SoPhong if ct.SoPhong else 'Chờ gán phòng' }}</small>
+                        {% for ct in dp['DanhSachChiTiet'] %}
+                        <tr style="border-bottom: 1px solid #f9f9f9;">
+                            <td style="padding: 20px 0; display: flex; gap: 15px; align-items: center;">
+                                <img src="{{ ct['HinhAnhHienThi'] }}" style="width: 100px; height: 65px; object-fit: cover; border-radius: 8px; border: 1px solid #eee;">
+                                <div>
+                                    <strong style="color: #333; display: block;">{{ ct['TenLoai'] }}</strong>
+                                    <small style="color: #ff4d4d; font-weight: 600;">{{ 'Phòng: ' ~ ct['SoPhong'] if ct['SoPhong'] else 'Đang gán phòng...' }}</small>
+                                </div>
                             </td>
-                            <td>
-                                {{ ct.NgayNhan }} <i class="fa-solid fa-arrow-right" style="font-size: 10px;"></i> {{ ct.NgayTra }}
+                            <td style="font-size: 14px; color: #555;">
+                                <div style="font-weight: 600;">{{ ct['NgayNhan'] }}</div>
+                                <div style="color: #ccc; font-size: 10px;"><i class="fa-solid fa-arrow-down"></i></div>
+                                <div style="font-weight: 600;">{{ ct['NgayTra'] }}</div>
                             </td>
-                            <td>{{ "{:,.0f}".format(ct.GiaPhong) }}đ</td>
+                            <td style="font-weight: 700; color: #222;">{{ "{:,.0f}".format(ct['GiaPhong']|int) }}đ</td>
                             <td>
-                                {% if ct.DanhSachDichVu %}
-                                    <ul style="list-style: none; padding: 0; font-size: 13px; color: #666;">
-                                        {% for dv in ct.DanhSachDichVu %}
-                                            <li><i class="fa-solid fa-check" style="color: green;"></i> {{ dv.TenDV }} (x{{ dv.SoLuong }})</li>
+                                {% if ct['DanhSachDichVu'] %}
+                                    <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px; color: #666;">
+                                        {% for dv in ct['DanhSachDichVu'] %}
+                                            <li><i class="fa-solid fa-circle-check" style="color: #2ecc71; font-size: 10px;"></i> {{ dv['TenDV'] }} (x{{ dv['SoLuong'] }})</li>
                                         {% endfor %}
                                     </ul>
                                 {% else %}
-                                    <span style="color: #ccc; font-size: 12px;">Không có dịch vụ</span>
+                                    <span style="color: #ddd; font-size: 12px; font-style: italic;">Không có dịch vụ</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -64,22 +79,24 @@
                 </table>
             </div>
 
-            <div class="booking-footer" style="padding: 15px 20px; text-align: right; background: #fff;">
-                <span style="margin-right: 20px;">Hình thức thanh toán: <strong>{{ dp.ThanhToan }}</strong></span>
-                <span style="font-size: 18px;">Tổng tiền: <strong style="color: #ff4d4d;">{{ "{:,.0f}".format(dp.TongTien) }}đ</strong></span>
+            <div class="booking-footer" style="padding: 20px; text-align: right; background: #fff; border-top: 1px solid #f5f5f5;">
+                <span style="margin-right: 30px; font-size: 14px; color: #777;">Thanh toán: <strong style="color: #333;">{{ dp['ThanhToan'] }}</strong></span>
+                <span style="font-size: 1.2rem; font-weight: 600;">Tổng tiền: <strong style="color: #ff4d4d; font-size: 1.5rem;">{{ "{:,.0f}".format(dp['TongTien']|int) }}đ</strong></span>
 
-                {% if dp.TrangThai == 'Chờ xác nhận' %}
-                    <form action="/cancel_booking" method="POST" style="display: inline-block; margin-left: 15px;">
-                        <input type="hidden" name="ma_dp" value="{{ dp.MaDP }}">
-                        <button type="submit" class="btn btn-outline" onclick="return confirm('Bạn có chắc muốn hủy đơn này?')">Hủy đơn</button>
+                {% if dp['TrangThai'] == 'Chờ xác nhận' %}
+                    <form action="/cancel_booking" method="POST" style="display: inline-block; margin-left: 20px;">
+                        <input type="hidden" name="ma_dp" value="{{ dp['MaDP'] }}">
+                        <button type="submit" class="btn-outline" onclick="return confirm('Mày có chắc chắn muốn hủy đơn này không?')">Hủy đơn</button>
                     </form>
                 {% endif %}
             </div>
         </div>
         {% endfor %}
     {% else %}
-        <div class="alert alert-danger" style="margin-top: 20px;">
-            Bạn chưa có lịch sử đặt phòng nào. <a href="/rooms_list">Đặt ngay!</a>
+        <div style="text-align: center; padding: 100px 0; background: white; border-radius: 20px; border: 2px dashed #eee;">
+            <i class="fa-solid fa-folder-open" style="font-size: 4rem; color: #eee; margin-bottom: 20px;"></i>
+            <h3 style="color: #ccc; font-weight: 400;">Mày chưa có lịch sử đặt phòng nào cả!</h3>
+            <a href="/rooms_list" style="display: inline-block; margin-top: 15px; color: #ff4d4d; font-weight: 700; text-decoration: none; border-bottom: 2px solid #ff4d4d;">Đặt phòng ngay dcm mày <i class="fa-solid fa-arrow-right"></i></a>
         </div>
     {% endif %}
 </div>

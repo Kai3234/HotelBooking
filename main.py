@@ -13,12 +13,6 @@ app.secret_key = 'FelixPham'
 
 BASE_URL = 'http://127.0.0.1:5000'
 
-# Route này là "cứu cánh" để lấy ảnh từ thư mục images nằm ngoài static
-@app.route('/images/<path:filename>')
-def serve_images(filename):
-    # Đường dẫn trỏ thẳng vào thư mục 'images' ngang hàng với main.py
-    image_path = os.path.join(app.root_path, 'images')
-    return send_from_directory(image_path, filename)
 
 @app.route('/')
 def main_index():
@@ -30,21 +24,34 @@ def main_index():
         response = requests.get(f"{BASE_URL}/api/top_rooms", timeout=5)
         if response.status_code == 200:
             top_rooms = response.json().get('data', [])
-            print(f"--- Đã lấy được {len(top_rooms)} phòng cho Trang Chủ ---")
+
+            # --- FIX ĐƯỜNG DẪN ẢNH (GIỮ NGUYÊN VÌ ĐÃ CHUẨN) ---
+            for r in top_rooms:
+                path = r.get('HinhAnhDaiDien')
+                if path and not path.startswith('http'):
+                    clean_path = path.lstrip('/')
+                    # Đảm bảo có dấu / giữa BASE_URL và clean_path
+                    r['HinhAnhDaiDien'] = f"{BASE_URL}/{clean_path}"
+
+            print(f"--- Đã lấy và fix đường dẫn cho {len(top_rooms)} phòng ---")
+            if top_rooms:
+                print(f"DEBUG PATH TRANG CHU: {top_rooms[0]['HinhAnhDaiDien']}")
+
     except Exception as e:
         print(f"Lỗi gọi API trang chủ: {e}")
-    # ----------------------------------------------
 
+    # --- LOGIC PHÂN QUYỀN GỌN GÀNG ---
     if 'current_user' in session:
         user = session['current_user']
-        if user['ChucVu'] == 'nhanvien':
-            if user.get('LaAdmin') == 1:
-                return redirect(url_for('dashboard_admin'))
+        # Nếu là nhân viên thì tống vào trang quản trị ngay và luôn
+        if user.get('ChucVu') == 'nhanvien':
+            # Phải chắc chắn có route tên dashboard_admin nhé dcm mày
             return redirect(url_for('dashboard_admin'))
-        # Truyền biến top_rooms vào đây
+
+        # Nếu là khách đã đăng nhập thì cho xem trang chủ
         return render_template('customer/index.html', top_rooms=top_rooms)
 
-    # Truyền biến top_rooms vào đây cho khách vãng lai
+    # Cho khách vãng lai chưa đăng nhập
     return render_template('customer/index.html', top_rooms=top_rooms)
 
 @app.route('/login', methods=['GET', 'POST'])

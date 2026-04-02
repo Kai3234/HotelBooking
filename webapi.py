@@ -210,7 +210,9 @@ def cancel_booking_customer_api(ma_dp):
         conn.close()
 
 
-from admin_api import *
+# from admin_api import *
+from customer_api import *
+from receptionist_api import *
 
 
 if __name__ == '__main__':

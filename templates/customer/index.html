@@ -168,7 +168,7 @@
         {% for room in top_rooms %}
         <div class="room-card">
             <div style="overflow: hidden; position: relative;">
-                <img src="http://127.0.0.1:5000{{ room['HinhAnhDaiDien'] if room['HinhAnhDaiDien'] else '/images/default_room.jpg' }}" class="room-image" alt="{{ room['TenLoai'] }}">
+                <img src="{{ room['HinhAnhDaiDien'] if room['HinhAnhDaiDien'] else 'http://127.0.0.1:5000/static/images/default_room.jpg' }}" class="room-image" alt="{{ room['TenLoai'] }}">
                 <div style="position: absolute; top: 15px; left: 15px; background: #ff4d4d; color: white; padding: 6px 15px; border-radius: 5px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">
                     Phổ biến nhất
                 </div>
@@ -198,83 +198,32 @@
     </div>
     <div class="room-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 35px;">
 
+        {% for room in top_rooms|reverse %}
+        {% if loop.index <= 3 %}
         <div class="room-card">
             <div style="overflow: hidden;">
-                <img src="http://127.0.0.1:5000/images/rooms/standard_2.jpg" class="room-image">
+                <img src="{{ room['HinhAnhDaiDien'] if room['HinhAnhDaiDien'] else 'http://127.0.0.1:5000/static/images/default_room.jpg' }}" class="room-image">
             </div>
             <div style="padding: 25px;">
-                <h3 style="margin: 0 0 10px 0; font-size: 1.5rem; color: #333; font-weight: 700;">Standard Cozy</h3>
-                <p style="color: #888; font-size: 14px; margin-bottom: 20px;"><i class="fa-solid fa-users"></i> Phù hợp cho 2 người lớn</p>
-
+                <h3 style="margin: 0 0 10px 0; font-size: 1.5rem; color: #333; font-weight: 700;">{{ room['TenLoai'] }}</h3>
+                <p style="color: #888; font-size: 14px; margin-bottom: 20px;"><i class="fa-solid fa-users"></i> Phù hợp cho {{ room['SoNguoiToiDa'] }} khách</p>
                 <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #eee; padding-top: 20px;">
-                    <div>
-                        <span style="color: #ff4d4d; font-weight: 800; font-size: 1.5rem;">550,000đ</span>
-                        <small style="color: #aaa; font-weight: 600;">/đêm</small>
-                    </div>
-                    <a href="/rooms_detail/1" style="background: #333; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: bold; transition: 0.3s;">
-                        Chi tiết
-                    </a>
+                    <div><span style="color: #ff4d4d; font-weight: 800; font-size: 1.5rem;">{{ "{:,.0f}".format(room['GiaTien']) }}đ</span></div>
+                    <a href="/rooms_detail/{{ room['MaLoai'] }}" style="background: #333; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: bold;">Chi tiết</a>
                 </div>
             </div>
         </div>
-
-        <div class="room-card">
-            <div style="overflow: hidden;">
-                <img src="http://127.0.0.1:5000/images/rooms/deluxe_2.jpg" class="room-image">
-            </div>
-            <div style="padding: 25px;">
-                <h3 style="margin: 0 0 10px 0; font-size: 1.5rem; color: #333; font-weight: 700;">Deluxe View</h3>
-                <p style="color: #888; font-size: 14px; margin-bottom: 20px;"><i class="fa-solid fa-users"></i> Phù hợp cho 3 người lớn</p>
-
-                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #eee; padding-top: 20px;">
-                    <div>
-                        <span style="color: #ff4d4d; font-weight: 800; font-size: 1.5rem;">890,000đ</span>
-                        <small style="color: #aaa; font-weight: 600;">/đêm</small>
-                    </div>
-                    <a href="/rooms_detail/2" style="background: #333; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: bold; transition: 0.3s;">
-                        Chi tiết
-                    </a>
-                </div>
-            </div>
-        </div>
-
-        <div class="room-card">
-            <div style="overflow: hidden;">
-                <img src="http://127.0.0.1:5000/images/rooms/suite_2.jpg" class="room-image">
-            </div>
-            <div style="padding: 25px;">
-                <h3 style="margin: 0 0 10px 0; font-size: 1.5rem; color: #333; font-weight: 700;">Suite VIP</h3>
-                <p style="color: #888; font-size: 14px; margin-bottom: 20px;"><i class="fa-solid fa-users"></i> Phù hợp cho 4 người lớn</p>
-
-                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #eee; padding-top: 20px;">
-                    <div>
-                        <span style="color: #ff4d4d; font-weight: 800; font-size: 1.5rem;">1,600,000đ</span>
-                        <small style="color: #aaa; font-weight: 600;">/đêm</small>
-                    </div>
-                    <a href="/rooms_detail/3" style="background: #333; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: bold; transition: 0.3s;">
-                        Chi tiết
-                    </a>
-                </div>
-            </div>
-        </div>
+        {% endif %}
+        {% endfor %}
 
     </div>
 </section>
-
 <section class="services-intro" style="
-    margin-top: 100px;
-    padding: 100px 20px;
-    background: radial-gradient(circle at top left, #2c3e50, #000000);
-    border-radius: 40px;
-    text-align: center;
-    color: white;
-    position: relative;
-    overflow: hidden;
-    box-shadow: inset 0 0 100px rgba(255, 77, 77, 0.1);
+    margin-top: 100px; padding: 100px 20px; background: radial-gradient(circle at top left, #2c3e50, #000000);
+    border-radius: 40px; text-align: center; color: white; position: relative; overflow: hidden; box-shadow: inset 0 0 100px rgba(255, 77, 77, 0.1);
 ">
     <div style="position: absolute; top: -10%; left: -5%; width: 300px; height: 300px; background: rgba(255, 77, 77, 0.05); filter: blur(80px); border-radius: 50%;"></div>
     <div style="position: absolute; bottom: -10%; right: -5%; width: 250px; height: 250px; background: rgba(255, 77, 77, 0.03); filter: blur(60px); border-radius: 50%;"></div>
-
     <div style="margin-bottom: 60px; position: relative; z-index: 1;">
         <h2 style="font-weight: 800; font-size: 2.8rem; margin-bottom: 15px; letter-spacing: -1px;">
             Dịch vụ <span style="color: #ff4d4d; text-shadow: 0 0 20px rgba(255, 77, 77, 0.4);">thượng lưu</span>
@@ -283,9 +232,7 @@
             Tận hưởng sự chăm sóc tận tâm trong từng khoảnh khắc tại Hải Đăng Store
         </p>
     </div>
-
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 30px; max-width: 1100px; margin: 0 auto; position: relative; z-index: 1;">
-
         <div style="padding: 50px 30px; background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border-radius: 30px; border: 1px solid rgba(255, 255, 255, 0.08); transition: 0.4s;"
              onmouseover="this.style.background='rgba(255, 77, 77, 0.08)'; this.style.borderColor='rgba(255, 77, 77, 0.3)'; this.style.transform='translateY(-15px)'"
              onmouseout="this.style.background='rgba(255, 255, 255, 0.03)'; this.style.borderColor='rgba(255, 255, 255, 0.08)'; this.style.transform='translateY(0)'">
@@ -295,7 +242,6 @@
             <h4 style="font-weight: 700; font-size: 1.3rem; margin-bottom: 12px;">Ẩm thực tinh tế</h4>
             <p style="font-size: 14px; color: #999; line-height: 1.5;">Hương vị đẳng cấp từ các đầu bếp danh tiếng thế giới.</p>
         </div>
-
         <div style="padding: 50px 30px; background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border-radius: 30px; border: 1px solid rgba(255, 255, 255, 0.08); transition: 0.4s;"
              onmouseover="this.style.background='rgba(255, 77, 77, 0.08)'; this.style.borderColor='rgba(255, 77, 77, 0.3)'; this.style.transform='translateY(-15px)'"
              onmouseout="this.style.background='rgba(255, 255, 255, 0.03)'; this.style.borderColor='rgba(255, 255, 255, 0.08)'; this.style.transform='translateY(0)'">
@@ -305,7 +251,6 @@
             <h4 style="font-weight: 700; font-size: 1.3rem; margin-bottom: 12px;">Wellness & Spa</h4>
             <p style="font-size: 14px; color: #999; line-height: 1.5;">Liệu trình phục hồi sức khỏe và tinh thần chuyên sâu.</p>
         </div>
-
         <div style="padding: 50px 30px; background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border-radius: 30px; border: 1px solid rgba(255, 255, 255, 0.08); transition: 0.4s;"
              onmouseover="this.style.background='rgba(255, 77, 77, 0.08)'; this.style.borderColor='rgba(255, 77, 77, 0.3)'; this.style.transform='translateY(-15px)'"
              onmouseout="this.style.background='rgba(255, 255, 255, 0.03)'; this.style.borderColor='rgba(255, 255, 255, 0.08)'; this.style.transform='translateY(0)'">
@@ -315,7 +260,6 @@
             <h4 style="font-weight: 700; font-size: 1.3rem; margin-bottom: 12px;">Hồ bơi vô cực</h4>
             <p style="font-size: 14px; color: #999; line-height: 1.5;">Không gian thư giãn với tầm nhìn panorama triệu đô.</p>
         </div>
-
         <div style="padding: 50px 30px; background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border-radius: 30px; border: 1px solid rgba(255, 255, 255, 0.08); transition: 0.4s;"
              onmouseover="this.style.background='rgba(255, 77, 77, 0.08)'; this.style.borderColor='rgba(255, 77, 77, 0.3)'; this.style.transform='translateY(-15px)'"
              onmouseout="this.style.background='rgba(255, 255, 255, 0.03)'; this.style.borderColor='rgba(255, 255, 255, 0.08)'; this.style.transform='translateY(0)'">
@@ -333,52 +277,26 @@
     document.addEventListener('DOMContentLoaded', function() {
         flatpickr("#checkin", { dateFormat: "d/m/Y", minDate: "today", animate: true });
         flatpickr("#checkout", { dateFormat: "d/m/Y", minDate: "today", animate: true });
-
         const guestPicker = document.getElementById('guestPicker');
         const guestDropdown = document.getElementById('guestDropdown');
-
-        guestPicker.addEventListener('click', (e) => {
-            e.stopPropagation();
-            guestDropdown.classList.toggle('show');
-            guestPicker.classList.toggle('active');
-        });
-
-        document.addEventListener('click', (e) => {
-            if (!guestPicker.contains(e.target)) {
-                guestDropdown.classList.remove('show');
-                guestPicker.classList.remove('active');
-            }
-        });
-
+        guestPicker.addEventListener('click', (e) => { e.stopPropagation(); guestDropdown.classList.toggle('show'); guestPicker.classList.toggle('active'); });
+        document.addEventListener('click', (e) => { if (!guestPicker.contains(e.target)) { guestDropdown.classList.remove('show'); guestPicker.classList.remove('active'); } });
         guestDropdown.addEventListener('click', (e) => e.stopPropagation());
     });
-
     let counts = { adults: 2, children: 0, rooms: 1, pets: false };
-
     function updateVal(type, change) {
         if (counts[type] + change < (type === 'children' ? 0 : 1)) return;
         counts[type] += change;
-
         document.getElementById('val' + type.charAt(0).toUpperCase() + type.slice(1)).innerText = counts[type];
         document.getElementById('input' + type.charAt(0).toUpperCase() + type.slice(1)).value = counts[type];
         renderText();
     }
-
-    function updatePets(cb) {
-        counts.pets = cb.checked;
-        document.getElementById('inputPets').value = counts.pets ? 1 : 0;
-        renderText();
-    }
-
+    function updatePets(cb) { counts.pets = cb.checked; document.getElementById('inputPets').value = counts.pets ? 1 : 0; renderText(); }
     function renderText() {
         let text = `${counts.adults} người lớn · ${counts.children} trẻ em · ${counts.rooms} phòng`;
         if (counts.pets) text += ` · 🐾`;
         document.getElementById('displayText').innerText = text;
     }
-
-    function closePicker() {
-        document.getElementById('guestDropdown').classList.remove('show');
-        document.getElementById('guestPicker').classList.remove('active');
-    }
+    function closePicker() { document.getElementById('guestDropdown').classList.remove('show'); document.getElementById('guestPicker').classList.remove('active'); }
 </script>
 {% endblock %}
