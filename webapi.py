@@ -107,6 +107,10 @@ def register_api():
     finally:
         conn.close()
 
+from admin_api import *
+from receptionist_api import *
+from customer_api import *
+
 if __name__ == '__main__':
     # Chạy API ở cổng 5000
     app.run(debug=True, port=5000)

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>{% block title %}Admin{% endblock %}</title>
-    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='/icon/user-tie-solid-full.svg') }}">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icon/user-tie-solid-full.svg') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles_base_backend.css') }}">
 </head>
@@ -20,7 +20,42 @@
                     <i class="fa-solid fa-chart-line"></i> Dashboard lễ tân
                 </a>
             </li>
-            <li><a href="#"><i class="fa-solid fa-calendar-check"></i> Quản lý Đặt phòng</a></li>
+
+            <li class="{{ 'active' if request.endpoint == 'rooms_layout_rec' else '' }}">
+                <a href="/rooms_layout_rec">
+                    <i class="fa-solid fa-bed"></i> Sơ đồ phòng
+                </a>
+            </li>
+
+            <li class="{{ 'active' if request.endpoint == 'rooms_assign_rec' else '' }}">
+                <a href="/rooms_assign_rec">
+                    <i class="fa-solid fa-people-roof"></i> Xếp phòng
+                </a>
+            </li>
+
+            <li class="{{ 'active' if request.endpoint == 'checkin_rec' else '' }}">
+                <a href="/checkin_rec">
+                    <i class="fa-solid fa-right-to-bracket"></i> Check-in
+                </a>
+            </li>
+
+            <li class="{{ 'active' if request.endpoint == 'checkout_rec' else '' }}">
+                <a href="/checkout_rec">
+                    <i class="fa-solid fa-right-from-bracket"></i> Check-out
+                </a>
+            </li>
+
+            <li class="{{ 'active' if request.endpoint == 'services_manage_rec' else '' }}">
+                <a href="/services_manage_rec">
+                    <i class="fa-solid fa-concierge-bell"></i> Quản lý dịch vụ
+                </a>
+            </li>
+
+            <li class="{{ 'active' if request.endpoint == 'customer_list_rec' else '' }}">
+                <a href="/customer_list_rec">
+                    <i class="fa-solid fa-users"></i> Quản lý Khách hàng
+                </a>
+            </li>
 
             {% if session.current_user.LaAdmin == 1 %}
             <li class="menu-header">NGHIỆP VỤ ADMIN</li>

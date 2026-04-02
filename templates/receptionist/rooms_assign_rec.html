@@ -1,0 +1,220 @@
+{% extends 'layout/base_backend.html' %}
+
+{% block title %}Quản lý & Gán phòng - RedHotel{% endblock %}
+
+{% block page_title %}Danh sách Đặt phòng & Gán phòng{% endblock %}
+
+{% block content %}
+
+<!-- 1. THANH CÔNG CỤ (TÌM KIẾM & LỌC) -->
+<div class="card" style="margin-bottom: 20px; padding: 15px 25px;">
+    <div class="toolbar" style="margin-bottom: 0;">
+        <div class="search-box">
+            <i class="fa-solid fa-search"></i>
+            <!-- Team Backend: Xử lý request.args.get('search') ở đây -->
+            <input type="text" placeholder="Tìm theo Mã đơn, Tên, SĐT khách...">
+        </div>
+        <div class="filter-group">
+            <label style="font-size: 13px; font-weight: 600; color: var(--text-muted);">Trạng thái:</label>
+            <select class="form-control" style="width: 180px; padding: 8px 15px;">
+                <option value="all">Tất cả đơn</option>
+                <option value="cho_gan">Chờ gán phòng</option>
+                <option value="da_gan">Đã gán (Chờ check-in)</option>
+                <option value="dang_o">Đang lưu trú</option>
+            </select>
+            <button class="btn btn-primary" style="padding: 8px 15px;"><i class="fa-solid fa-filter"></i> Lọc</button>
+        </div>
+    </div>
+</div>
+
+<!-- 2. BẢNG DANH SÁCH ĐƠN ĐẶT PHÒNG -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Danh sách cần xử lý hôm nay</h3>
+    </div>
+
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Mã Đơn / Chi Tiết</th>
+                    <th>Khách Hàng</th>
+                    <th>Loại Phòng Đặt</th>
+                    <th>Thời Gian Lưu Trú</th>
+                    <th>Trạng Thái</th>
+                    <th>Hành Động</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- TEAM BACKEND: Chạy vòng lặp for item in bookings ở đây -->
+                
+                <!-- DÒNG 1: TRƯỜNG HỢP CHƯA CÓ SỐ PHÒNG (CẦN GÁN PHÒNG) -->
+                <tr>
+                    <td>
+                        <strong>#DP1002</strong><br>
+                        <small style="color: var(--text-muted);">Chi tiết: #CTDP55</small>
+                    </td>
+                    <td>
+                        <span style="font-weight: 600; color: var(--text-dark);">Lê Văn Khách</span><br>
+                        <small style="color: gray;"><i class="fa-solid fa-phone" style="font-size: 10px;"></i> 0901234567</small>
+                    </td>
+                    <td>
+                        <span style="color: var(--primary-red); font-weight: 600;">Standard Giường Đôi</span><br>
+                        <small style="color: gray;">2 Người lớn</small>
+                    </td>
+                    <td>
+                        <span style="font-weight: 500;">28/03/2026</span> <i class="fa-solid fa-arrow-right" style="font-size: 10px; color: gray; margin: 0 5px;"></i> <span style="font-weight: 500;">29/03/2026</span>
+                    </td>
+                    <td>
+                        <span class="badge badge-warning">Chờ nhận phòng</span>
+                        <div style="font-size: 11px; margin-top: 5px; color: #F1416C;"><i class="fa-solid fa-circle-exclamation"></i> Chưa gán số phòng</div>
+                    </td>
+                    <td>
+                        <!-- Nút này sẽ gọi hàm JS openAssignModal, truyền dữ liệu giả vào -->
+                        <button class="btn-sm btn-success" onclick="openAssignModal('DP1002', 'CTDP55', 'Lê Văn Khách', 'Standard Giường Đôi')">
+                            <i class="fa-solid fa-key"></i> Gán phòng
+                        </button>
+                    </td>
+                </tr>
+
+                <!-- DÒNG 2: TRƯỜNG HỢP ĐÃ GÁN PHÒNG (CHỜ KHÁCH ĐẾN CHECK-IN) -->
+                <tr>
+                    <td>
+                        <strong>#DP1003</strong><br>
+                        <small style="color: var(--text-muted);">Chi tiết: #CTDP56</small>
+                    </td>
+                    <td>
+                        <span style="font-weight: 600; color: var(--text-dark);">Trần Thị B</span><br>
+                        <small style="color: gray;"><i class="fa-solid fa-phone" style="font-size: 10px;"></i> 0987654321</small>
+                    </td>
+                    <td>
+                        <span style="color: var(--primary-red); font-weight: 600;">Deluxe Hướng Biển</span><br>
+                        <small style="color: gray;">Đã gán: <strong>Phòng 201</strong></small>
+                    </td>
+                    <td>
+                        <span style="font-weight: 500;">28/03/2026</span> <i class="fa-solid fa-arrow-right" style="font-size: 10px; color: gray; margin: 0 5px;"></i> <span style="font-weight: 500;">30/03/2026</span>
+                    </td>
+                    <td>
+                        <span class="badge badge-success" style="background-color: #E1F0FF; color: #009EF7;">Đã gán phòng</span>
+                    </td>
+                    <td>
+                        <!-- Khi khách đến quầy, bấm Check-in để đổi trạng thái thành "Đang lưu trú" -->
+                        <form action="#" method="POST" style="display:inline;">
+                            <button type="button" class="btn-sm btn-primary">
+                                <i class="fa-solid fa-clipboard-check"></i> Check-in
+                            </button>
+                        </form>
+                        <button class="btn-sm btn-outline"><i class="fa-solid fa-pen"></i> Đổi phòng</button>
+                    </td>
+                </tr>
+
+                <!-- DÒNG 3: TRƯỜNG HỢP KHÁCH ĐANG Ở -->
+                <tr>
+                    <td>
+                        <strong>#DP0995</strong><br>
+                        <small style="color: var(--text-muted);">Chi tiết: #CTDP50</small>
+                    </td>
+                    <td>
+                        <span style="font-weight: 600; color: var(--text-dark);">Lê Đức C</span><br>
+                        <small style="color: gray;"><i class="fa-solid fa-phone" style="font-size: 10px;"></i> 0912345678</small>
+                    </td>
+                    <td>
+                        <span style="color: var(--primary-red); font-weight: 600;">Suite Gia Đình VIP</span><br>
+                        <small style="color: gray;">Đang ở: <strong>Phòng 301</strong></small>
+                    </td>
+                    <td>
+                        <span style="font-weight: 500;">26/03/2026</span> <i class="fa-solid fa-arrow-right" style="font-size: 10px; color: gray; margin: 0 5px;"></i> <span style="font-weight: 500;">29/03/2026</span>
+                    </td>
+                    <td>
+                        <span class="badge badge-success">Đang lưu trú</span>
+                    </td>
+                    <td>
+                        <button class="btn-sm btn-danger" style="background-color: #333;">
+                            <i class="fa-solid fa-right-from-bracket"></i> Check-out
+                        </button>
+                    </td>
+                </tr>
+
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Phân trang -->
+    <div class="pagination">
+        <div class="page-item"><i class="fa-solid fa-chevron-left"></i></div>
+        <div class="page-item active">1</div>
+        <div class="page-item">2</div>
+        <div class="page-item"><i class="fa-solid fa-chevron-right"></i></div>
+    </div>
+</div>
+
+<!-- ================= 3. MODAL GÁN PHÒNG (POPUP) ================= -->
+<div class="modal-overlay" id="assignRoomModal">
+    <div class="modal-content" style="width: 550px;">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-key" style="color: var(--primary-red); margin-right: 10px;"></i> Gán Phòng Cho Khách</h3>
+            <button class="btn-close" onclick="closeAssignModal()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        
+        <!-- Team Backend: Cập nhật route xử lý POST tại đây -->
+        <form action="#" method="POST">
+            <div class="modal-body">
+                <!-- Input ẩn lưu Mã Chi tiết đặt phòng để Backend biết đang update phòng nào -->
+                <input type="hidden" name="ma_ctdp" id="input_ma_ctdp">
+
+                <div style="background-color: var(--bg-light); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <p style="margin-bottom: 5px;">Mã đơn: <strong id="modal_ma_dp" style="color: var(--primary-red);"></strong></p>
+                    <p style="margin-bottom: 5px;">Khách hàng: <strong id="modal_ten_kh"></strong></p>
+                    <p>Yêu cầu: <strong>Loại phòng <span id="modal_loai_phong"></span></strong></p>
+                </div>
+
+                <div class="form-group">
+                    <label>Chọn phòng thực tế (Chỉ hiển thị phòng trống & sạch sẽ) <span class="required">*</span></label>
+                    <select class="form-control" name="ma_phong" required>
+                        <option value="">-- Vui lòng chọn số phòng --</option>
+                        
+                        <!-- Team Backend: Loop danh sách phòng có TrangThai = 'Sẵn sàng' VÀ MaLoai tương ứng -->
+                        <optgroup label="Tầng 1">
+                            <option value="1">Phòng 101 - Sẵn sàng</option>
+                            <option value="2">Phòng 102 - Sẵn sàng</option>
+                        </optgroup>
+                        
+                        <!-- Demo phòng không khả dụng để Lễ tân không chọn được -->
+                        <optgroup label="Tầng 2 (Bảo trì / Đang có khách)">
+                            <option value="4" disabled>Phòng 202 - Đang bảo trì</option>
+                        </optgroup>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeAssignModal()">Hủy bỏ</button>
+                <button type="submit" class="btn btn-success"><i class="fa-solid fa-check"></i> Xác nhận Gán Phòng</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ================= SCRIPT ĐIỀU KHIỂN MODAL ================= -->
+<script>
+    // Hàm mở Modal và truyền dữ liệu từ bảng vào Modal
+    function openAssignModal(maDp, maCtdp, tenKhach, loaiPhong) {
+        // Gán text hiển thị
+        document.getElementById('modal_ma_dp').innerText = '#' + maDp;
+        document.getElementById('modal_ten_kh').innerText = tenKhach;
+        document.getElementById('modal_loai_phong').innerText = loaiPhong;
+        
+        // Gán value cho input hidden để submit form
+        document.getElementById('input_ma_ctdp').value = maCtdp;
+        
+        // Hiển thị modal
+        document.getElementById('assignRoomModal').classList.add('show');
+    }
+
+    // Hàm đóng Modal
+    function closeAssignModal() {
+        document.getElementById('assignRoomModal').classList.remove('show');
+    }
+</script>
+
+{% endblock %}

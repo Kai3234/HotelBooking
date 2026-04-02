@@ -1,0 +1,189 @@
+{% extends 'layout/base_backend.html' %}
+
+{% block title %}Sơ đồ Phòng - RedHotel{% endblock %}
+{% block page_title %}Sơ đồ Khách sạn & Tra cứu phòng trống{% endblock %}
+
+{% block content %}
+
+<!-- BỔ SUNG CSS RIÊNG CHO SƠ ĐỒ PHÒNG -->
+<style>
+    /* Thanh chú thích trạng thái */
+    .status-legend { display: flex; gap: 20px; margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border-color); }
+    .legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--text-dark); }
+    .legend-box { width: 16px; height: 16px; border-radius: 4px; border: 2px solid; }
+
+    /* Layout Sơ đồ Tầng */
+    .floor-title { font-size: 18px; font-weight: 700; color: var(--text-dark); margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
+    .floor-title span { background: var(--text-dark); color: white; padding: 2px 8px; border-radius: 4px; font-size: 14px; }
+    
+    .room-map-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 15px; }
+    
+    /* Thiết kế Box Phòng */
+    .room-box {
+        border-radius: 10px;
+        padding: 15px 10px;
+        text-align: center;
+        border: 2px solid;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+        position: relative;
+        overflow: hidden;
+    }
+    .room-box:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+    
+    .room-number { font-size: 22px; font-weight: 800; margin-bottom: 5px; line-height: 1; }
+    .room-type { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8; }
+    .room-icon { margin-bottom: 8px; font-size: 18px; }
+
+    /* CÁC TRẠNG THÁI MÀU SẮC */
+    /* 1. Trống (Available) - Màu Xanh Lá */
+    .status-available { background-color: #E8FFF3; border-color: #50CD89; color: #187D44; }
+    .status-available .legend-box { background-color: #E8FFF3; border-color: #50CD89; }
+    
+    /* 2. Có khách (Occupied / Booked) - Màu Đỏ */
+    .status-occupied { background-color: var(--light-red); border-color: var(--primary-red); color: var(--hover-red); }
+    .status-occupied .legend-box { background-color: var(--light-red); border-color: var(--primary-red); }
+    
+    /* 3. Đang bảo trì (Maintenance) - Màu Xám/Cam */
+    .status-maintenance { background-color: #F5F8FA; border-color: #A1A5B7; color: #7E8299; opacity: 0.7; }
+    .status-maintenance .legend-box { background-color: #F5F8FA; border-color: #A1A5B7; }
+    
+    /* Badge phụ hiển thị trên Box (VD: Báo khách sắp check-out) */
+    .room-badge { position: absolute; top: 0; right: 0; background: var(--primary-red); color: white; font-size: 10px; padding: 2px 5px; border-bottom-left-radius: 6px; font-weight: bold; }
+</style>
+
+<!-- ================= 1. BỘ LỌC TÌM KIẾM THEO NGÀY ================= -->
+<div class="card">
+    <div class="card-header" style="margin-bottom: 15px; border-bottom: none; padding-bottom: 0;">
+        <h3 class="card-title"><i class="fa-solid fa-calendar-check" style="color: var(--primary-red); margin-right: 8px;"></i> Tra cứu trạng thái phòng</h3>
+    </div>
+    
+    <!-- Team Backend: Nhận request GET từ form này để filter -->
+    <form action="#" method="GET" class="toolbar" style="margin-bottom: 0; background: var(--bg-light); padding: 15px; border-radius: 8px;">
+        <div class="filter-group" style="flex: 1; display: flex; gap: 20px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <label style="font-weight: 600; font-size: 14px;">Từ ngày:</label>
+                <!-- Dùng type="date", nếu khách sạn tính theo giờ có thể đổi thành type="datetime-local" -->
+                <input type="date" name="checkin_date" class="form-control" style="width: 160px;" value="2026-04-02" required>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <label style="font-weight: 600; font-size: 14px;">Đến ngày:</label>
+                <input type="date" name="checkout_date" class="form-control" style="width: 160px;" value="2026-04-05" required>
+            </div>
+            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-search"></i> Kiểm tra</button>
+        </div>
+    </form>
+
+    <!-- Chú thích màu sắc -->
+    <div class="status-legend">
+        <div class="legend-item"><div class="legend-box" style="background-color: #E8FFF3; border-color: #50CD89;"></div> Trống / Sẵn sàng</div>
+        <div class="legend-item"><div class="legend-box" style="background-color: var(--light-red); border-color: var(--primary-red);"></div> Đã đặt / Đang ở</div>
+        <div class="legend-item"><div class="legend-box" style="background-color: #F5F8FA; border-color: #A1A5B7;"></div> Đang bảo trì</div>
+    </div>
+</div>
+
+<!-- ================= 2. SƠ ĐỒ CÁC TẦNG ================= -->
+<!-- TEAM BACKEND LƯU Ý: Dùng vòng lặp for tang, danh_sach_phong in dict_tang.items()  -->
+
+<!-- TẦNG 1 -->
+<div class="card">
+    <div class="floor-title"><span>T1</span> Tầng 1 (Khu Vực Sảnh)</div>
+    <div class="room-map-grid">
+        
+        <!-- Phòng Trống -->
+        <div class="room-box status-available" title="Trống - Standard Giường Đôi">
+            <div class="room-icon"><i class="fa-solid fa-door-open"></i></div>
+            <div class="room-number">101</div>
+            <div class="room-type">Standard</div>
+        </div>
+
+        <!-- Phòng Trống -->
+        <div class="room-box status-available" title="Trống - Standard Giường Đôi">
+            <div class="room-icon"><i class="fa-solid fa-door-open"></i></div>
+            <div class="room-number">102</div>
+            <div class="room-type">Standard</div>
+        </div>
+        
+        <!-- Phòng Có khách -->
+        <div class="room-box status-occupied" title="Lê Văn Khách - Trả phòng: 05/04">
+            <div class="room-icon"><i class="fa-solid fa-bed"></i></div>
+            <div class="room-number">103</div>
+            <div class="room-type">Standard</div>
+        </div>
+
+    </div>
+</div>
+
+<!-- TẦNG 2 -->
+<div class="card">
+    <div class="floor-title"><span>T2</span> Tầng 2 (View Biển)</div>
+    <div class="room-map-grid">
+        
+        <!-- Phòng Có khách (Hiển thị thêm badge Trả trong ngày) -->
+        <div class="room-box status-occupied" title="Lý Mạc Sầu - Trả phòng HÔM NAY">
+            <div class="room-badge">Trả hôm nay</div>
+            <div class="room-icon"><i class="fa-solid fa-suitcase-rolling"></i></div>
+            <div class="room-number">201</div>
+            <div class="room-type">Deluxe View</div>
+        </div>
+
+        <!-- Phòng Bảo trì -->
+        <div class="room-box status-maintenance" title="Đang hỏng điều hòa">
+            <div class="room-icon"><i class="fa-solid fa-screwdriver-wrench"></i></div>
+            <div class="room-number">202</div>
+            <div class="room-type">Deluxe View</div>
+        </div>
+
+        <!-- Phòng Trống -->
+        <div class="room-box status-available">
+            <div class="room-icon"><i class="fa-solid fa-door-open"></i></div>
+            <div class="room-number">203</div>
+            <div class="room-type">Deluxe View</div>
+        </div>
+        
+        <!-- Phòng Trống -->
+        <div class="room-box status-available">
+            <div class="room-icon"><i class="fa-solid fa-door-open"></i></div>
+            <div class="room-number">204</div>
+            <div class="room-type">Deluxe View</div>
+        </div>
+
+    </div>
+</div>
+
+<!-- TẦNG 3 -->
+<div class="card">
+    <div class="floor-title"><span>T3</span> Tầng 3 (Khu VIP)</div>
+    <div class="room-map-grid">
+        
+        <div class="room-box status-occupied" title="Lê Đức C - Suite VIP">
+            <div class="room-icon"><i class="fa-solid fa-crown"></i></div>
+            <div class="room-number">301</div>
+            <div class="room-type">Suite VIP</div>
+        </div>
+        
+        <div class="room-box status-available">
+            <div class="room-icon"><i class="fa-solid fa-crown"></i></div>
+            <div class="room-number">302</div>
+            <div class="room-type">Suite VIP</div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Mẹo cho UI: Script nhỏ để click vào phòng trống thì hiện thông báo hoặc chuyển sang gán phòng -->
+<script>
+    document.querySelectorAll('.room-box').forEach(box => {
+        box.addEventListener('click', function() {
+            if(this.classList.contains('status-available')) {
+                // Code mẫu: Chuyển hướng sang trang tạo đơn đặt phòng mới
+                // window.location.href = '/tao-don-moi?room=' + this.querySelector('.room-number').innerText;
+                alert('Bạn vừa chọn phòng trống: ' + this.querySelector('.room-number').innerText);
+            } else if(this.classList.contains('status-occupied')) {
+                alert('Phòng ' + this.querySelector('.room-number').innerText + ' đang có khách. Vui lòng vào trang Quản lý Đặt phòng để xem chi tiết.');
+            }
+        });
+    });
+</script>
+
+{% endblock %}

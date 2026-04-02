@@ -1,0 +1,196 @@
+{% extends 'layout/base_backend.html' %}
+
+{% block title %}Tra cứu Khách hàng - RedHotel{% endblock %}
+{% block page_title %}Danh sách & Tra cứu Khách hàng{% endblock %}
+
+{% block content %}
+
+<!-- 1. THANH CÔNG CỤ TÌM KIẾM -->
+<div class="card" style="margin-bottom: 20px; padding: 15px 25px;">
+    <!-- Team Backend: Nhận request GET từ form này để tìm kiếm -->
+    <form action="#" method="GET" class="toolbar" style="margin-bottom: 0;">
+        <div class="search-box" style="width: 400px;">
+            <i class="fa-solid fa-search"></i>
+            <input type="text" name="search" placeholder="Nhập Tên, Số điện thoại hoặc Email khách hàng..." required>
+        </div>
+        <div class="filter-group">
+            <label style="font-size: 13px; font-weight: 600; color: var(--text-muted);">Trạng thái hiện tại:</label>
+            <select class="form-control" name="status_filter" style="width: 180px; padding: 8px 15px;">
+                <option value="all">Tất cả khách hàng</option>
+                <option value="dang_o">Đang lưu trú</option>
+                <option value="sap_den">Đang có đơn chờ đến</option>
+            </select>
+            <button type="submit" class="btn btn-primary" style="padding: 8px 15px;"><i class="fa-solid fa-filter"></i> Lọc</button>
+        </div>
+    </form>
+</div>
+
+<!-- 2. BẢNG DANH SÁCH KHÁCH HÀNG -->
+<div class="card">
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Mã KH</th>
+                    <th>Thông Tin Khách Hàng</th>
+                    <th>Tình Trạng Hiện Tại</th>
+                    <th>Lịch Sử Đặt</th>
+                    <th>Hành Động</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- TRƯỜNG HỢP 1: KHÁCH ĐANG LƯU TRÚ -->
+                <tr>
+                    <td><strong>#KH007</strong></td>
+                    <td>
+                        <span style="font-weight: 700; color: var(--text-dark); font-size: 15px;">Lý Mạc Sầu</span><br>
+                        <small style="color: gray;"><i class="fa-solid fa-phone" style="font-size: 11px;"></i> 0933445566</small><br>
+                        <small style="color: gray;"><i class="fa-solid fa-envelope" style="font-size: 11px;"></i> lymacsau@gmail.com</small>
+                    </td>
+                    <td>
+                        <!-- Dựa vào bảng DATPHONG có trạng thái 'Đang lưu trú' -->
+                        <span class="badge badge-success" style="margin-bottom: 5px;">Đang lưu trú</span><br>
+                        <small style="color: var(--primary-red); font-weight: 600;"><i class="fa-solid fa-door-closed"></i> Phòng 201</small>
+                    </td>
+                    <td><span style="font-weight: 600;">3</span> đơn thành công</td>
+                    <td>
+                        <button class="btn-sm btn-outline" onclick="openCustomerModal('KH007', 'Lý Mạc Sầu')">
+                            <i class="fa-solid fa-eye"></i> Xem lịch sử
+                        </button>
+                    </td>
+                </tr>
+
+                <!-- TRƯỜNG HỢP 2: KHÁCH SẮP ĐẾN (CÓ ĐƠN ĐANG CHỜ) -->
+                <tr>
+                    <td><strong>#KH012</strong></td>
+                    <td>
+                        <span style="font-weight: 700; color: var(--text-dark); font-size: 15px;">Trương Vô Kỵ</span><br>
+                        <small style="color: gray;"><i class="fa-solid fa-phone" style="font-size: 11px;"></i> 0988776655</small><br>
+                        <small style="color: gray;"><i class="fa-solid fa-envelope" style="font-size: 11px;"></i> tvk@gmail.com</small>
+                    </td>
+                    <td>
+                        <!-- Dựa vào bảng DATPHONG có trạng thái 'Chờ xác nhận' / 'Đã xác nhận' -->
+                        <span class="badge badge-warning" style="margin-bottom: 5px;">Sắp check-in</span><br>
+                        <small style="color: var(--text-dark); font-weight: 600;"><i class="fa-regular fa-calendar-check"></i> Đến ngày: 05/04</small>
+                    </td>
+                    <td><span style="font-weight: 600;">1</span> đơn thành công</td>
+                    <td>
+                        <button class="btn-sm btn-outline" onclick="openCustomerModal('KH012', 'Trương Vô Kỵ')">
+                            <i class="fa-solid fa-eye"></i> Xem lịch sử
+                        </button>
+                    </td>
+                </tr>
+
+                <!-- TRƯỜNG HỢP 3: KHÁCH HÀNG CŨ (KHÔNG CÓ ĐƠN NÀO ACTIVE) -->
+                <tr>
+                    <td><strong>#KH002</strong></td>
+                    <td>
+                        <span style="font-weight: 700; color: var(--text-dark); font-size: 15px;">Lê Văn Khách</span><br>
+                        <small style="color: gray;"><i class="fa-solid fa-phone" style="font-size: 11px;"></i> 0901234567</small><br>
+                        <small style="color: gray;"><i class="fa-solid fa-envelope" style="font-size: 11px;"></i> levankhach@gmail.com</small>
+                    </td>
+                    <td>
+                        <span class="badge" style="background: var(--bg-light); color: var(--text-muted); border: 1px solid var(--border-color);">Không có đơn mới</span>
+                    </td>
+                    <td><span style="font-weight: 600;">5</span> đơn thành công</td>
+                    <td>
+                        <button class="btn-sm btn-outline" onclick="openCustomerModal('KH002', 'Lê Văn Khách')">
+                            <i class="fa-solid fa-eye"></i> Xem lịch sử
+                        </button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Phân trang -->
+    <div class="pagination">
+        <div class="page-item"><i class="fa-solid fa-chevron-left"></i></div>
+        <div class="page-item active">1</div>
+        <div class="page-item">2</div>
+        <div class="page-item"><i class="fa-solid fa-chevron-right"></i></div>
+    </div>
+</div>
+
+<!-- ================= 3. MODAL: XEM LỊCH SỬ ĐẶT PHÒNG CỦA KHÁCH ================= -->
+<div class="modal-overlay" id="customerModal">
+    <div class="modal-content" style="width: 700px;">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-user" style="color: var(--primary-red); margin-right: 10px;"></i> Chi Tiết Khách Hàng</h3>
+            <button class="btn-close" onclick="closeCustomerModal()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        
+        <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px dashed var(--border-color);">
+                <div>
+                    <h4 id="modal_ten_kh" style="font-size: 18px; color: var(--primary-red); margin-bottom: 5px;"></h4>
+                    <p style="color: var(--text-muted); font-size: 13px;">Mã số: <strong id="modal_ma_kh"></strong></p>
+                </div>
+                <!-- Nút tiện ích để Lễ tân tạo đơn mới nhanh cho khách này -->
+                <button class="btn btn-primary"><i class="fa-solid fa-plus"></i> Tạo Đơn Mới</button>
+            </div>
+
+            <h5 style="margin-bottom: 10px; color: var(--text-dark);">Lịch sử giao dịch (Đơn đặt phòng)</h5>
+            
+            <table style="font-size: 13px;">
+                <thead style="background-color: var(--bg-light);">
+                    <tr>
+                        <th>Mã Đơn</th>
+                        <th>Ngày Đặt</th>
+                        <th>Phòng / Loại</th>
+                        <th>Tổng Tiền</th>
+                        <th>Trạng Thái</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Dữ liệu mẫu (Backend dùng Vòng lặp render các đơn của KH này ra đây) -->
+                    <tr>
+                        <td><strong>#DP1005</strong></td>
+                        <td>01/04/2026</td>
+                        <td>Phòng 201 <br><small style="color:gray;">Deluxe View</small></td>
+                        <td style="font-weight: 600;">1,500,000đ</td>
+                        <td><span class="badge badge-success">Đang lưu trú</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>#DP0890</strong></td>
+                        <td>15/01/2026</td>
+                        <td>Phòng 102 <br><small style="color:gray;">Standard</small></td>
+                        <td style="font-weight: 600;">500,000đ</td>
+                        <td><span class="badge badge-gray" style="background:#f1f1f1; color:gray;">Hoàn tất</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>#DP0540</strong></td>
+                        <td>20/10/2025</td>
+                        <td>Phòng 301 <br><small style="color:gray;">Suite VIP</small></td>
+                        <td style="font-weight: 600;">2,500,000đ</td>
+                        <td><span class="badge badge-danger" style="background:var(--light-red); color:var(--primary-red);">Đã hủy</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="modal-footer" style="justify-content: flex-end;">
+            <button class="btn btn-outline" onclick="closeCustomerModal()">Đóng Cửa Sổ</button>
+        </div>
+    </div>
+</div>
+
+<!-- ================= SCRIPT ĐIỀU KHIỂN ================= -->
+<script>
+    function openCustomerModal(maKh, tenKh) {
+        // Cập nhật text trong Modal
+        document.getElementById('modal_ma_kh').innerText = '#' + maKh;
+        document.getElementById('modal_ten_kh').innerText = tenKh;
+        
+        // (Nâng cao cho Backend: Có thể dùng AJAX (fetch) gọi lên API lấy lịch sử đơn theo maKh rồi render vào tbody)
+        
+        // Mở modal
+        document.getElementById('customerModal').classList.add('show');
+    }
+
+    function closeCustomerModal() {
+        document.getElementById('customerModal').classList.remove('show');
+    }
+</script>
+
+{% endblock %}

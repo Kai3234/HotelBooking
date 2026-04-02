@@ -1,0 +1,127 @@
+{% extends 'layout/base_backend.html' %}
+
+{% block title %}Quản lý Check-in - RedHotel{% endblock %}
+{% block page_title %}Xác nhận Check-in (Nhận phòng){% endblock %}
+
+{% block content %}
+
+<!-- THANH CÔNG CỤ -->
+<div class="card" style="margin-bottom: 20px; padding: 15px 25px;">
+    <div class="toolbar" style="margin-bottom: 0;">
+        <div class="search-box">
+            <i class="fa-solid fa-search"></i>
+            <input type="text" placeholder="Tìm Mã đơn, Tên khách đến hôm nay...">
+        </div>
+        <div class="filter-group">
+            <button class="btn btn-outline"><i class="fa-regular fa-calendar-days"></i> Chỉ hiện khách đến hôm nay</button>
+        </div>
+    </div>
+</div>
+
+<!-- BẢNG DANH SÁCH CHỜ CHECK-IN -->
+<div class="card">
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Mã Đơn</th>
+                    <th>Khách Hàng</th>
+                    <th>Phòng Đã Gán</th>
+                    <th>Ngày Nhận - Trả</th>
+                    <th>Trạng Thái</th>
+                    <th>Hành Động</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- ĐƠN HỢP LỆ ĐỂ CHECK-IN -->
+                <tr>
+                    <td><strong>#DP1005</strong></td>
+                    <td>
+                        <span style="font-weight: 600;">Lý Mạc Sầu</span><br>
+                        <small style="color: gray;">0933445566</small>
+                    </td>
+                    <td>
+                        <span style="color: var(--primary-red); font-weight: 600;">Phòng 201</span><br>
+                        <small>Deluxe Hướng Biển</small>
+                    </td>
+                    <td>02/04/2026 <i class="fa-solid fa-arrow-right" style="font-size: 10px; color: gray;"></i> 05/04/2026</td>
+                    <td><span class="badge badge-success" style="background-color: #E1F0FF; color: #009EF7;">Đã gán phòng</span></td>
+                    <td>
+                        <button class="btn-sm btn-primary" onclick="openCheckinModal('DP1005', 'Lý Mạc Sầu', 'Phòng 201')">
+                            <i class="fa-solid fa-clipboard-check"></i> Xác nhận Check-in
+                        </button>
+                    </td>
+                </tr>
+
+                <!-- ĐƠN CHƯA GÁN PHÒNG (KHÔNG THỂ CHECK-IN) -->
+                <tr>
+                    <td><strong>#DP1006</strong></td>
+                    <td>
+                        <span style="font-weight: 600;">Trương Vô Kỵ</span><br>
+                        <small style="color: gray;">0988776655</small>
+                    </td>
+                    <td>
+                        <span style="color: #F1416C; font-weight: 600;">Chưa gán phòng</span><br>
+                        <small>Suite Gia Đình VIP</small>
+                    </td>
+                    <td>02/04/2026 <i class="fa-solid fa-arrow-right" style="font-size: 10px; color: gray;"></i> 04/04/2026</td>
+                    <td><span class="badge badge-warning">Chờ nhận phòng</span></td>
+                    <td>
+                        <a href="#" class="btn-sm btn-outline"><i class="fa-solid fa-key"></i> Đi tới Gán phòng</a>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- MODAL XÁC NHẬN CHECK-IN -->
+<div class="modal-overlay" id="checkinModal">
+    <div class="modal-content" style="width: 500px;">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-clipboard-check" style="color: var(--primary-red);"></i> Thủ Tục Check-in</h3>
+            <button class="btn-close" onclick="closeCheckinModal()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        
+        <form action="#" method="POST">
+            <div class="modal-body">
+                <input type="hidden" name="ma_dp" id="ci_ma_dp">
+                
+                <div style="background-color: var(--bg-light); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <p>Mã đơn: <strong id="ci_text_ma" style="color: var(--primary-red);"></strong></p>
+                    <p>Khách hàng: <strong id="ci_text_ten"></strong></p>
+                    <p>Giao chìa khóa: <strong id="ci_text_phong" style="font-size: 16px;"></strong></p>
+                </div>
+
+                <!-- Form phụ trợ cho Lễ tân -->
+                <div class="form-group">
+                    <label>Tiền cọc giữ phòng (Tùy chọn)</label>
+                    <input type="number" class="form-control" name="tien_coc" placeholder="VD: 500000">
+                </div>
+                
+                <div style="display: flex; gap: 10px; align-items: center; margin-top: 15px;">
+                    <input type="checkbox" id="check_id" required style="width: 18px; height: 18px; accent-color: var(--primary-red);">
+                    <label for="check_id" style="font-size: 14px; font-weight: 600;">Đã thu giữ CCCD/Hộ chiếu của khách</label>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeCheckinModal()">Hủy</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Hoàn Tất Check-in</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openCheckinModal(maDp, ten, phong) {
+        document.getElementById('ci_text_ma').innerText = '#' + maDp;
+        document.getElementById('ci_text_ten').innerText = ten;
+        document.getElementById('ci_text_phong').innerText = phong;
+        document.getElementById('ci_ma_dp').value = maDp;
+        document.getElementById('checkinModal').classList.add('show');
+    }
+    function closeCheckinModal() { document.getElementById('checkinModal').classList.remove('show'); }
+</script>
+
+{% endblock %}
