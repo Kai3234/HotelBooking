@@ -1,1 +1,497 @@
-from webapi import app
+from flask import request, jsonify
+from webapi import app, get_db
+
+# ─────────────────────────────────────────────
+# 🔹 1. THỐNG KÊ DASHBOARD (STATISTICS)
+# ─────────────────────────────────────────────
+@app.route('/api/admin/stats', methods=['GET'])
+def admin_stats():
+    conn = get_db()
+    try:
+        stats = {
+            'total_rooms': conn.execute("SELECT COUNT(*) FROM PHONG").fetchone()[0],
+            'available_rooms': conn.execute("SELECT COUNT(*) FROM PHONG WHERE TrangThai = 'Sẵn sàng'").fetchone()[0],
+            'total_customers': conn.execute("SELECT COUNT(*) FROM KHACHHANG").fetchone()[0],
+            'total_bookings': conn.execute("SELECT COUNT(*) FROM DATPHONG").fetchone()[0],
+            'pending_bookings': conn.execute("SELECT COUNT(*) FROM DATPHONG WHERE TrangThai = 'Chờ xác nhận'").fetchone()[0],
+            'staying_bookings': conn.execute("SELECT COUNT(*) FROM DATPHONG WHERE TrangThai = 'Đang lưu trú'").fetchone()[0],
+        }
+        return jsonify({"status": "success", "data": stats})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
+
+# ─────────────────────────────────────────────
+# 🔹 2. QUẢN LÝ PHÒNG (ROOMS)
+# ─────────────────────────────────────────────
+@app.route('/api/rooms', methods=['GET'])
+def get_rooms_api():
+    search = request.args.get('search', '')
+    filter_floor = request.args.get('tang', '')
+    filter_type = request.args.get('ma_loai', '')
+    filter_status = request.args.get('trang_thai', '')
+
+    conn = get_db()
+    query = """
+        SELECT p.*, lp.TenLoai
+        FROM PHONG p
+        JOIN LOAIPHONG lp ON p.MaLoai = lp.MaLoai
+        WHERE 1=1
+    """
+    params = []
+    if search:
+        query += " AND (p.SoPhong LIKE ? OR p.MoTa LIKE ?)"
+        params += [f'%{search}%', f'%{search}%']
+    if filter_floor:
+        query += " AND p.Tang = ?"
+        params.append(filter_floor)
+    if filter_type:
+        query += " AND p.MaLoai = ?"
+        params.append(filter_type)
+    if filter_status:
+        query += " AND p.TrangThai = ?"
+        params.append(filter_status)
+    query += " ORDER BY p.Tang, p.SoPhong"
+    
+    rooms = conn.execute(query, params).fetchall()
+    room_types = conn.execute("SELECT * FROM LOAIPHONG ORDER BY TenLoai").fetchall()
+    floors = conn.execute("SELECT DISTINCT Tang FROM PHONG ORDER BY Tang").fetchall()
+    conn.close()
+    
+    return jsonify({
+        "status": "success",
+        "rooms": [dict(r) for r in rooms],
+        "room_types": [dict(rt) for rt in room_types],
+        "floors": [dict(f) for f in floors]
+    })
+
+@app.route('/api/rooms/add', methods=['POST'])
+def add_room_api():
+    data = request.get_json()
+    conn = get_db()
+    try:
+        conn.execute(
+            "INSERT INTO PHONG (SoPhong, Tang, MaLoai, MoTa, TrangThai) VALUES (?, ?, ?, ?, ?)",
+            (data['so_phong'], int(data['tang']), int(data['ma_loai']), data.get('mo_ta', ''), data.get('trang_thai', 'Sẵn sàng'))
+        )
+        conn.commit()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/rooms/edit/<int:id>', methods=['POST'])
+def edit_room_api(id):
+    data = request.get_json()
+    conn = get_db()
+    try:
+        conn.execute(
+            "UPDATE PHONG SET SoPhong=?, Tang=?, MaLoai=?, MoTa=?, TrangThai=? WHERE MaPhong=?",
+            (data['so_phong'], int(data['tang']), int(data['ma_loai']), data.get('mo_ta', ''), data.get('trang_thai', 'Sẵn sàng'), id)
+        )
+        conn.commit()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/rooms/toggle/<int:id>', methods=['POST'])
+def toggle_room_api(id):
+    conn = get_db()
+    try:
+        room = conn.execute("SELECT TrangThai FROM PHONG WHERE MaPhong=?", (id,)).fetchone()
+        if room:
+            new_status = 'Bảo trì' if room['TrangThai'] == 'Sẵn sàng' else 'Sẵn sàng'
+            conn.execute("UPDATE PHONG SET TrangThai=? WHERE MaPhong=?", (new_status, id))
+            conn.commit()
+            return jsonify({"status": "success", "new_status": new_status})
+        return jsonify({"status": "error", "message": "Room not found"}), 404
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/rooms/lock/<int:id>', methods=['POST'])
+def lock_room_api(id):
+    conn = get_db()
+    try:
+        room = conn.execute("SELECT TrangThai FROM PHONG WHERE MaPhong=?", (id,)).fetchone()
+        if room:
+            new_status = 'Sẵn sàng' if room['TrangThai'] == 'Khóa' else 'Khóa'
+            conn.execute("UPDATE PHONG SET TrangThai=? WHERE MaPhong=?", (new_status, id))
+            conn.commit()
+            return jsonify({"status": "success", "new_status": new_status})
+        return jsonify({"status": "error", "message": "Room not found"}), 404
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
+
+# ─────────────────────────────────────────────
+# 🔹 3. QUẢN LÝ LOẠI PHÒNG (ROOM TYPES)
+# ─────────────────────────────────────────────
+@app.route('/api/room-types', methods=['GET'])
+def get_room_types_api():
+    search = request.args.get('search', '')
+    filter_status = request.args.get('trang_thai', '')
+    conn = get_db()
+    query = "SELECT * FROM LOAIPHONG WHERE 1=1"
+    params = []
+    if search:
+        query += " AND TenLoai LIKE ?"
+        params.append(f'%{search}%')
+    if filter_status:
+        query += " AND TrangThai = ?"
+        params.append(filter_status)
+    query += " ORDER BY TenLoai"
+    types = conn.execute(query, params).fetchall()
+    conn.close()
+    return jsonify({"status": "success", "room_types": [dict(t) for t in types]})
+
+@app.route('/api/room-types/add', methods=['POST'])
+def add_room_type_api():
+    data = request.get_json()
+    conn = get_db()
+    try:
+        conn.execute(
+            "INSERT INTO LOAIPHONG (TenLoai, GiaTien, SoNguoiToiDa, MoTa, TrangThai) VALUES (?, ?, ?, ?, 'Hiển thị')",
+            (data['ten_loai'], int(data['gia_tien']), int(data['so_nguoi']), data.get('mo_ta', ''))
+        )
+        conn.commit()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/room-types/edit/<int:id>', methods=['POST'])
+def edit_room_type_api(id):
+    data = request.get_json()
+    conn = get_db()
+    try:
+        conn.execute(
+            "UPDATE LOAIPHONG SET TenLoai=?, GiaTien=?, SoNguoiToiDa=?, MoTa=?, TrangThai=? WHERE MaLoai=?",
+            (data['ten_loai'], int(data['gia_tien']), int(data['so_nguoi']), data.get('mo_ta', ''), data['trang_thai'], id)
+        )
+        conn.commit()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/room-types/toggle/<int:id>', methods=['POST'])
+def toggle_room_type_api(id):
+    conn = get_db()
+    try:
+        rt = conn.execute("SELECT TrangThai FROM LOAIPHONG WHERE MaLoai=?", (id,)).fetchone()
+        if rt:
+            new_status = 'Ẩn' if rt['TrangThai'] == 'Hiển thị' else 'Hiển thị'
+            conn.execute("UPDATE PHONG SET TrangThai=? WHERE MaLoai=?", (new_status, id))
+            conn.execute("UPDATE LOAIPHONG SET TrangThai=? WHERE MaLoai=?", (new_status, id))
+            conn.commit()
+            return jsonify({"status": "success", "new_status": new_status})
+        return jsonify({"status": "error", "message": "Not found"}), 404
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/room-types/<int:id>/images', methods=['GET'])
+def get_room_type_images_api(id):
+    conn = get_db()
+    images = conn.execute("SELECT * FROM HINHANH_LOAIPHONG WHERE MaLoai=? ORDER BY LaAnhDaiDien DESC, ThuTu ASC", (id,)).fetchall()
+    room_type = conn.execute("SELECT * FROM LOAIPHONG WHERE MaLoai=?", (id,)).fetchone()
+    conn.close()
+    return jsonify({
+        "status": "success",
+        "images": [dict(img) for img in images],
+        "room_type": dict(room_type) if room_type else {}
+    })
+
+@app.route('/api/room-types/<int:id>/images/add', methods=['POST'])
+def add_room_type_image_api(id):
+    data = request.get_json()
+    conn = get_db()
+    try:
+        if data.get('la_anh_dai_dien') == 1:
+            conn.execute("UPDATE HINHANH_LOAIPHONG SET LaAnhDaiDien=0 WHERE MaLoai=?", (id,))
+        conn.execute(
+            "INSERT INTO HINHANH_LOAIPHONG (MaLoai, HinhAnh, ThuTu, LaAnhDaiDien) VALUES (?, ?, ?, ?)",
+            (id, data['hinh_anh'], int(data.get('thu_tu', 0)), int(data.get('la_anh_dai_dien', 0)))
+        )
+        conn.commit()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/room-types/images/set-avatar/<int:id>', methods=['POST'])
+def set_room_type_avatar_api(id):
+    conn = get_db()
+    try:
+        img = conn.execute("SELECT MaLoai FROM HINHANH_LOAIPHONG WHERE MaAnh=?", (id,)).fetchone()
+        if img:
+            conn.execute("UPDATE HINHANH_LOAIPHONG SET LaAnhDaiDien=0 WHERE MaLoai=?", (img['MaLoai'],))
+            conn.execute("UPDATE HINHANH_LOAIPHONG SET LaAnhDaiDien=1 WHERE MaAnh=?", (id,))
+            conn.commit()
+            return jsonify({"status": "success"})
+        return jsonify({"status": "error", "message": "Not found"}), 404
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/room-types/images/delete/<int:id>', methods=['POST'])
+def delete_room_type_image_api(id):
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM HINHANH_LOAIPHONG WHERE MaAnh=?", (id,))
+        conn.commit()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/room-types/images/reorder', methods=['POST'])
+def reorder_room_type_images_api():
+    data = request.get_json()
+    orders = data.get('orders', [])
+    conn = get_db()
+    try:
+        for item in orders:
+            conn.execute("UPDATE HINHANH_LOAIPHONG SET ThuTu=? WHERE MaAnh=?", (item['thu_tu'], item['ma_anh']))
+        conn.commit()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
+
+# ─────────────────────────────────────────────
+# 🔹 4. QUẢN LÝ DỊCH VỤ (SERVICES)
+# ─────────────────────────────────────────────
+@app.route('/api/services_admin', methods=['GET'])
+def get_services_api():
+    search = request.args.get('search', '')
+    filter_status = request.args.get('trang_thai', '')
+    conn = get_db()
+    query = "SELECT * FROM DICHVU WHERE 1=1"
+    params = []
+    if search:
+        query += " AND (TenDV LIKE ? OR MoTa LIKE ?)"
+        params += [f'%{search}%', f'%{search}%']
+    if filter_status:
+        query += " AND TrangThai = ?"
+        params.append(filter_status)
+    query += " ORDER BY TenDV"
+    services = conn.execute(query, params).fetchall()
+    conn.close()
+    return jsonify({"status": "success", "services": [dict(s) for s in services]})
+
+@app.route('/api/services/add', methods=['POST'])
+def add_service_api():
+    data = request.get_json()
+    conn = get_db()
+    try:
+        conn.execute(
+            "INSERT INTO DICHVU (TenDV, MoTa, GiaTien, ThayDoiSL, TrangThai, HinhAnh) VALUES (?, ?, ?, ?, 'Đang có', ?)",
+            (data['ten_dv'], data.get('mo_ta', ''), int(data['gia_tien']), int(data.get('thay_doi_sl', 0)), data.get('hinh_anh'))
+        )
+        conn.commit()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/services/edit/<int:id>', methods=['POST'])
+def edit_service_api(id):
+    data = request.get_json()
+    conn = get_db()
+    try:
+        conn.execute(
+            "UPDATE DICHVU SET TenDV=?, MoTa=?, GiaTien=?, ThayDoiSL=?, TrangThai=?, HinhAnh=? WHERE MaDV=?",
+            (data['ten_dv'], data.get('mo_ta', ''), int(data['gia_tien']), int(data.get('thay_doi_sl', 0)), data['trang_thai'], data.get('hinh_anh'), id)
+        )
+        conn.commit()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/services/toggle/<int:id>', methods=['POST'])
+def toggle_service_api(id):
+    conn = get_db()
+    try:
+        svc = conn.execute("SELECT TrangThai FROM DICHVU WHERE MaDV=?", (id,)).fetchone()
+        if svc:
+            new_status = 'Đang khóa' if svc['TrangThai'] == 'Đang có' else 'Đang có'
+            conn.execute("UPDATE DICHVU SET TrangThai=? WHERE MaDV=?", (new_status, id))
+            conn.commit()
+            return jsonify({"status": "success", "new_status": new_status})
+        return jsonify({"status": "error", "message": "Not found"}), 404
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
+
+# ─────────────────────────────────────────────
+# 🔹 5. QUẢN LÝ NHÂN VIÊN (STAFFS)
+# ─────────────────────────────────────────────
+@app.route('/api/staffs', methods=['GET'])
+def get_staffs_api():
+    search = request.args.get('search', '')
+    filter_role = request.args.get('la_admin', '')
+    filter_status = request.args.get('trang_thai', '')
+    conn = get_db()
+    query = "SELECT * FROM NHANVIEN WHERE 1=1"
+    params = []
+    if search:
+        query += " AND (HoTen LIKE ? OR SDT LIKE ? OR Email LIKE ?)"
+        params += [f'%{search}%', f'%{search}%', f'%{search}%']
+    if filter_role != '':
+        query += " AND LaAdmin = ?"
+        params.append(filter_role)
+    if filter_status:
+        query += " AND TrangThai = ?"
+        params.append(filter_status)
+    query += " ORDER BY LaAdmin DESC, HoTen"
+    staffs = conn.execute(query, params).fetchall()
+    conn.close()
+    return jsonify({"status": "success", "staffs": [dict(s) for s in staffs]})
+
+@app.route('/api/staffs/add', methods=['POST'])
+def add_staff_api():
+    data = request.get_json()
+    conn = get_db()
+    try:
+        conn.execute(
+            "INSERT INTO NHANVIEN (HoTen, Email, SDT, MatKhau, LaAdmin, TrangThai) VALUES (?, ?, ?, ?, ?, 'Hoạt động')",
+            (data['ho_ten'], data.get('email', ''), data['sdt'], data['mat_khau'], int(data.get('la_admin', 0)))
+        )
+        conn.commit()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/staffs/edit/<int:id>', methods=['POST'])
+def edit_staff_api(id):
+    data = request.get_json()
+    conn = get_db()
+    try:
+        if data.get('mat_khau'):
+            conn.execute(
+                "UPDATE NHANVIEN SET HoTen=?, Email=?, SDT=?, MatKhau=?, LaAdmin=?, TrangThai=? WHERE MaNV=?",
+                (data['ho_ten'], data.get('email', ''), data['sdt'], data['mat_khau'], int(data.get('la_admin', 0)), data['trang_thai'], id)
+            )
+        else:
+            conn.execute(
+                "UPDATE NHANVIEN SET HoTen=?, Email=?, SDT=?, LaAdmin=?, TrangThai=? WHERE MaNV=?",
+                (data['ho_ten'], data.get('email', ''), data['sdt'], int(data.get('la_admin', 0)), data['trang_thai'], id)
+            )
+        conn.commit()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/staffs/toggle/<int:id>', methods=['POST'])
+def toggle_staff_api(id):
+    conn = get_db()
+    try:
+        nv = conn.execute("SELECT TrangThai FROM NHANVIEN WHERE MaNV=?", (id,)).fetchone()
+        if nv:
+            new_status = 'Khóa' if nv['TrangThai'] == 'Hoạt động' else 'Hoạt động'
+            conn.execute("UPDATE NHANVIEN SET TrangThai=? WHERE MaNV=?", (new_status, id))
+            conn.commit()
+            return jsonify({"status": "success", "new_status": new_status})
+        return jsonify({"status": "error", "message": "Not found"}), 404
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
+
+# ─────────────────────────────────────────────
+# 🔹 6. QUẢN LÝ KHÁCH HÀNG (CUSTOMERS)
+# ─────────────────────────────────────────────
+@app.route('/api/customers_admin', methods=['GET'])
+def get_customers_admin_api():
+    search = request.args.get('search', '')
+    filter_status = request.args.get('trang_thai', '')
+    conn = get_db()
+    query = "SELECT * FROM KHACHHANG WHERE 1=1"
+    params = []
+    if search:
+        query += " AND (HoTen LIKE ? OR Email LIKE ? OR SDT LIKE ?)"
+        params += [f'%{search}%', f'%{search}%', f'%{search}%']
+    if filter_status:
+        query += " AND TrangThai = ?"
+        params.append(filter_status)
+    query += " ORDER BY HoTen"
+    customers = conn.execute(query, params).fetchall()
+    conn.close()
+    return jsonify({"status": "success", "customers": [dict(c) for c in customers]})
+
+@app.route('/api/customers/add', methods=['POST'])
+def add_customer_api():
+    data = request.get_json()
+    conn = get_db()
+    try:
+        conn.execute(
+            "INSERT INTO KHACHHANG (HoTen, Email, SDT, MatKhau, TrangThai) VALUES (?, ?, ?, ?, 'Hoạt động')",
+            (data['ho_ten'], data['email'], data['sdt'], data['mat_khau'])
+        )
+        conn.commit()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/customers/edit/<int:id>', methods=['POST'])
+def edit_customer_api(id):
+    data = request.get_json()
+    conn = get_db()
+    try:
+        if data.get('mat_khau'):
+            conn.execute(
+                "UPDATE KHACHHANG SET HoTen=?, Email=?, SDT=?, MatKhau=?, TrangThai=? WHERE MaKH=?",
+                (data['ho_ten'], data['email'], data['sdt'], data['mat_khau'], data['trang_thai'], id)
+            )
+        else:
+            conn.execute(
+                "UPDATE KHACHHANG SET HoTen=?, Email=?, SDT=?, TrangThai=? WHERE MaKH=?",
+                (data['ho_ten'], data['email'], data['sdt'], data['trang_thai'], id)
+            )
+        conn.commit()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/customers/toggle/<int:id>', methods=['POST'])
+def toggle_customer_api(id):
+    conn = get_db()
+    try:
+        kh = conn.execute("SELECT TrangThai FROM KHACHHANG WHERE MaKH=?", (id,)).fetchone()
+        if kh:
+            new_status = 'Khóa' if kh['TrangThai'] == 'Hoạt động' else 'Hoạt động'
+            conn.execute("UPDATE KHACHHANG SET TrangThai=? WHERE MaKH=?", (new_status, id))
+            conn.commit()
+            return jsonify({"status": "success", "new_status": new_status})
+        return jsonify({"status": "error", "message": "Not found"}), 404
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()

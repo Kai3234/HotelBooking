@@ -1,42 +1,30 @@
-import sqlite3
+import requests
+
 import os
 from flask import session, redirect, render_template, request, url_for, flash, jsonify
 from main import app
 
-DB_PATH = 'db/website.db'
+# Địa chỉ Backend API (webapi.py chạy ở cổng 5000)
+API_URL = "http://127.0.0.1:5000/api"
 
+def call_api(endpoint, method='GET', data=None, params=None):
+    """Helper function để gọi Backend API (webapi.py)."""
+    url = f"{API_URL}/{endpoint.lstrip('/')}"
+    try:
+        if method == 'GET':
+            response = requests.get(url, params=params)
+        elif method == 'POST':
+            response = requests.post(url, json=data)
+        else:
+            return None
+        
+        if response.status_code == 200:
+            return response.json()
+        return None
+    except Exception as e:
+        print(f"API Error ({url}): {str(e)}")
+        return None
 
-def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-def init_schema():
-    """Tự động thêm các cột mới nếu chưa tồn tại (tránh lỗi ALTER TABLE khi đã có)."""
-    conn = get_db()
-    c = conn.cursor()
-
-    def add_column_if_not_exists(table, column, definition):
-        try:
-            c.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
-            conn.commit()
-        except Exception:
-            pass  # Cột đã tồn tại
-
-    add_column_if_not_exists('KHACHHANG', 'TrangThai', "TEXT NOT NULL DEFAULT 'Hoạt động'")
-    add_column_if_not_exists('NHANVIEN',  'TrangThai', "TEXT NOT NULL DEFAULT 'Hoạt động'")
-    add_column_if_not_exists('NHANVIEN',  'Email',     "TEXT")
-    add_column_if_not_exists('LOAIPHONG', 'TrangThai', "TEXT NOT NULL DEFAULT 'Hiển thị'")
-    add_column_if_not_exists('LOAIPHONG', 'MoTa',      "TEXT")
-    add_column_if_not_exists('PHONG',     'MoTa',      "TEXT")          # ← DB cũ chưa có
-    add_column_if_not_exists('HINHANH_LOAIPHONG', 'ThuTu',        "INTEGER NOT NULL DEFAULT 0")
-    add_column_if_not_exists('HINHANH_LOAIPHONG', 'LaAnhDaiDien', "INTEGER NOT NULL DEFAULT 0")
-    conn.close()
-
-
-# Gọi init schema ngay khi import
-init_schema()
 
 
 def require_admin(f):
@@ -59,17 +47,10 @@ def require_admin(f):
 @app.route('/dashboard_admin')
 @require_admin
 def dashboard_admin():
-    conn = get_db()
-    stats = {
-        'total_rooms': conn.execute("SELECT COUNT(*) FROM PHONG").fetchone()[0],
-        'available_rooms': conn.execute("SELECT COUNT(*) FROM PHONG WHERE TrangThai = 'Sẵn sàng'").fetchone()[0],
-        'total_customers': conn.execute("SELECT COUNT(*) FROM KHACHHANG").fetchone()[0],
-        'total_bookings': conn.execute("SELECT COUNT(*) FROM DATPHONG").fetchone()[0],
-        'pending_bookings': conn.execute("SELECT COUNT(*) FROM DATPHONG WHERE TrangThai = 'Chờ xác nhận'").fetchone()[0],
-        'staying_bookings': conn.execute("SELECT COUNT(*) FROM DATPHONG WHERE TrangThai = 'Đang lưu trú'").fetchone()[0],
-    }
-    conn.close()
+    res = call_api('/admin/stats')
+    stats = res.get('data') if res else {}
     return render_template('admin/dashboard_admin.html', stats=stats)
+
 
 
 # ─────────────────────────────────────────────
@@ -78,145 +59,95 @@ def dashboard_admin():
 @app.route('/rooms_admin')
 @require_admin
 def rooms_admin():
-    conn = get_db()
-    search = request.args.get('search', '').strip()
-    filter_floor = request.args.get('tang', '')
-    filter_type = request.args.get('ma_loai', '')
-    filter_status = request.args.get('trang_thai', '')
+    params = {
+        'search': request.args.get('search', '').strip(),
+        'tang': request.args.get('tang', ''),
+        'ma_loai': request.args.get('ma_loai', ''),
+        'trang_thai': request.args.get('trang_thai', '')
+    }
 
-    query = """
-        SELECT p.*, lp.TenLoai
-        FROM PHONG p
-        JOIN LOAIPHONG lp ON p.MaLoai = lp.MaLoai
-        WHERE 1=1
-    """
-    params = []
-    if search:
-        query += " AND (p.SoPhong LIKE ? OR p.MoTa LIKE ?)"
-        params += [f'%{search}%', f'%{search}%']
-    if filter_floor:
-        try:
-            query += " AND p.Tang = ?"
-            params.append(int(filter_floor))
-        except ValueError:
-            pass
-    if filter_type:
-        query += " AND p.MaLoai = ?"
-        params.append(filter_type)
-    if filter_status:
-        query += " AND p.TrangThai = ?"
-        params.append(filter_status)
-    query += " ORDER BY p.Tang, p.SoPhong"
+    res = call_api('/rooms', params=params)
+    if not res:
+        flash('Không thể kết nối Backend API!', 'danger')
+        return render_template('admin/rooms_admin.html', rooms=[], room_types=[], floors=[])
 
-    rooms = conn.execute(query, params).fetchall()
-    room_types = conn.execute("SELECT * FROM LOAIPHONG ORDER BY TenLoai").fetchall()
-    floors = conn.execute("SELECT DISTINCT Tang FROM PHONG ORDER BY Tang").fetchall()
-    conn.close()
     return render_template('admin/rooms_admin.html',
-                           rooms=rooms, room_types=room_types, floors=floors,
-                           search=search, filter_floor=filter_floor,
-                           filter_type=filter_type, filter_status=filter_status)
+                           rooms=res.get('rooms', []),
+                           room_types=res.get('room_types', []),
+                           floors=res.get('floors', []),
+                           search=params['search'],
+                           filter_floor=params['tang'],
+                           filter_type=params['ma_loai'],
+                           filter_status=params['trang_thai'])
+
 
 
 @app.route('/rooms_admin/add', methods=['POST'])
 @require_admin
 def rooms_admin_add():
-    so_phong = request.form.get('so_phong', '').strip()
-    tang = request.form.get('tang', '').strip()
-    ma_loai = request.form.get('ma_loai', '').strip()
-    mo_ta = request.form.get('mo_ta', '').strip()
-    trang_thai = request.form.get('trang_thai', 'Sẵn sàng')
+    data = {
+        'so_phong': request.form.get('so_phong', '').strip(),
+        'tang': request.form.get('tang', '').strip(),
+        'ma_loai': request.form.get('ma_loai', '').strip(),
+        'mo_ta': request.form.get('mo_ta', '').strip(),
+        'trang_thai': request.form.get('trang_thai', 'Sẵn sàng')
+    }
 
-    if not so_phong or not tang or not ma_loai:
-        flash('Vui lòng nhập đầy đủ thông tin bắt buộc!', 'danger')
+    if not data['so_phong'] or not data['tang'] or not data['ma_loai']:
+        flash('Vui lòng nhập đầy đủ thông tin!', 'danger')
         return redirect(url_for('rooms_admin'))
 
-    conn = get_db()
-    try:
-        existing = conn.execute("SELECT * FROM PHONG WHERE SoPhong = ?", (so_phong,)).fetchone()
-        if existing:
-            flash(f'Số phòng "{so_phong}" đã tồn tại!', 'danger')
-        else:
-            conn.execute(
-                "INSERT INTO PHONG (SoPhong, Tang, MaLoai, MoTa, TrangThai) VALUES (?, ?, ?, ?, ?)",
-                (so_phong, int(tang), int(ma_loai), mo_ta, trang_thai)
-            )
-            conn.commit()
-            flash(f'Đã thêm phòng {so_phong} thành công!', 'success')
-    except Exception as e:
-        flash(f'Lỗi: {str(e)}', 'danger')
-    finally:
-        conn.close()
+    res = call_api('/rooms/add', method='POST', data=data)
+    if res and res.get('status') == 'success':
+        flash(f"Đã thêm phòng {data['so_phong']} thành công!", 'success')
+    else:
+        error_msg = res.get('message') if res else 'Lỗi kết nối API'
+        flash(f'Lỗi: {error_msg}', 'danger')
+        
     return redirect(url_for('rooms_admin'))
+
 
 
 @app.route('/rooms_admin/edit/<int:ma_phong>', methods=['POST'])
 @require_admin
 def rooms_admin_edit(ma_phong):
-    so_phong = request.form.get('so_phong', '').strip()
-    tang = request.form.get('tang', '').strip()
-    ma_loai = request.form.get('ma_loai', '').strip()
-    mo_ta = request.form.get('mo_ta', '').strip()
-    trang_thai = request.form.get('trang_thai', 'Sẵn sàng')
+    data = {
+        'so_phong': request.form.get('so_phong', '').strip(),
+        'tang': request.form.get('tang', '').strip(),
+        'ma_loai': request.form.get('ma_loai', '').strip(),
+        'mo_ta': request.form.get('mo_ta', '').strip(),
+        'trang_thai': request.form.get('trang_thai')
+    }
 
-    conn = get_db()
-    try:
-        conn.execute(
-            "UPDATE PHONG SET SoPhong=?, Tang=?, MaLoai=?, MoTa=?, TrangThai=? WHERE MaPhong=?",
-            (so_phong, int(tang), int(ma_loai), mo_ta, trang_thai, ma_phong)
-        )
-        conn.commit()
+    res = call_api(f'/rooms/edit/{ma_phong}', method='POST', data=data)
+    if res and res.get('status') == 'success':
         flash('Cập nhật phòng thành công!', 'success')
-    except Exception as e:
-        flash(f'Lỗi: {str(e)}', 'danger')
-    finally:
-        conn.close()
+    else:
+        error_msg = res.get('message') if res else 'Lỗi kết nối API'
+        flash(f'Lỗi: {error_msg}', 'danger')
+        
     return redirect(url_for('rooms_admin'))
+
 
 
 @app.route('/rooms_admin/toggle/<int:ma_phong>', methods=['POST'])
 @require_admin
 def rooms_admin_toggle(ma_phong):
-    """Toggle Sẵn sàng ↔ Bảo trì (chỉ khi phòng không bị Khóa)."""
-    conn = get_db()
-    try:
-        room = conn.execute("SELECT TrangThai FROM PHONG WHERE MaPhong=?", (ma_phong,)).fetchone()
-        if room:
-            if room['TrangThai'] == 'Khóa':
-                return jsonify({'success': False, 'error': 'Phòng đang bị khóa, không thể thay đổi trạng thái!'})
-            new_status = 'Bảo trì' if room['TrangThai'] == 'Sẵn sàng' else 'Sẵn sàng'
-            conn.execute("UPDATE PHONG SET TrangThai=? WHERE MaPhong=?", (new_status, ma_phong))
-            conn.commit()
-            return jsonify({'success': True, 'new_status': new_status})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-    finally:
-        conn.close()
-    return jsonify({'success': False})
+    res = call_api(f'/rooms/toggle/{ma_phong}', method='POST')
+    if res and res.get('status') == 'success':
+        return jsonify({'success': True, 'new_status': res.get('new_status')})
+    return jsonify({'success': False, 'error': res.get('message') if res else 'Lỗi API'})
+
 
 
 @app.route('/rooms_admin/lock/<int:ma_phong>', methods=['POST'])
 @require_admin
 def rooms_admin_lock(ma_phong):
-    """Khóa / Mở khóa phòng (thay cho xóa)."""
-    conn = get_db()
-    try:
-        room = conn.execute("SELECT TrangThai FROM PHONG WHERE MaPhong=?", (ma_phong,)).fetchone()
-        if room:
-            if room['TrangThai'] == 'Khóa':
-                # Mở khóa → trả về Sẵn sàng
-                new_status = 'Sẵn sàng'
-            else:
-                # Khóa phòng
-                new_status = 'Khóa'
-            conn.execute("UPDATE PHONG SET TrangThai=? WHERE MaPhong=?", (new_status, ma_phong))
-            conn.commit()
-            return jsonify({'success': True, 'new_status': new_status})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-    finally:
-        conn.close()
-    return jsonify({'success': False})
+    res = call_api(f'/rooms/lock/{ma_phong}', method='POST')
+    if res and res.get('status') == 'success':
+        return jsonify({'success': True, 'new_status': res.get('new_status')})
+    return jsonify({'success': False, 'error': res.get('message') if res else 'Lỗi API'})
+
 
 
 # ─────────────────────────────────────────────
@@ -225,196 +156,137 @@ def rooms_admin_lock(ma_phong):
 @app.route('/rooms_types_admin')
 @require_admin
 def rooms_types_admin():
-    conn = get_db()
-    search = request.args.get('search', '').strip()
-    filter_status = request.args.get('trang_thai', '')
+    params = {
+        'search': request.args.get('search', '').strip(),
+        'trang_thai': request.args.get('trang_thai', '')
+    }
 
-    query = "SELECT * FROM LOAIPHONG WHERE 1=1"
-    params = []
-    if search:
-        query += " AND TenLoai LIKE ?"
-        params.append(f'%{search}%')
-    if filter_status:
-        query += " AND TrangThai = ?"
-        params.append(filter_status)
-    query += " ORDER BY TenLoai"
-
-    room_types = conn.execute(query, params).fetchall()
-    conn.close()
+    res = call_api('/room-types', params=params)
     return render_template('admin/rooms_types_admin.html',
-                           room_types=room_types,
-                           search=search, filter_status=filter_status)
+                           room_types=res.get('room_types', []) if res else [],
+                           search=params['search'], 
+                           filter_status=params['trang_thai'])
+
 
 
 @app.route('/rooms_types_admin/add', methods=['POST'])
 @require_admin
 def rooms_types_admin_add():
-    ten_loai = request.form.get('ten_loai', '').strip()
-    gia_tien = request.form.get('gia_tien', '').strip()
-    so_nguoi = request.form.get('so_nguoi', '').strip()
-    mo_ta = request.form.get('mo_ta', '').strip()
+    data = {
+        'ten_loai': request.form.get('ten_loai', '').strip(),
+        'gia_tien': request.form.get('gia_tien', '').strip(),
+        'so_nguoi': request.form.get('so_nguoi', '').strip(),
+        'mo_ta': request.form.get('mo_ta', '').strip()
+    }
 
-    if not ten_loai or not gia_tien or not so_nguoi:
-        flash('Vui lòng nhập đầy đủ thông tin bắt buộc!', 'danger')
+    if not data['ten_loai'] or not data['gia_tien'] or not data['so_nguoi']:
+        flash('Vui lòng nhập đầy đủ thông tin!', 'danger')
         return redirect(url_for('rooms_types_admin'))
 
-    conn = get_db()
-    try:
-        conn.execute(
-            "INSERT INTO LOAIPHONG (TenLoai, GiaTien, SoNguoiToiDa, MoTa, TrangThai) VALUES (?, ?, ?, ?, 'Hiển thị')",
-            (ten_loai, int(gia_tien), int(so_nguoi), mo_ta)
-        )
-        conn.commit()
-        flash(f'Đã thêm loại phòng "{ten_loai}" thành công!', 'success')
-    except Exception as e:
-        flash(f'Lỗi: {str(e)}', 'danger')
-    finally:
-        conn.close()
+    res = call_api('/room-types/add', method='POST', data=data)
+    if res and res.get('status') == 'success':
+        flash(f"Đã thêm loại phòng \"{data['ten_loai']}\" thành công!", 'success')
+    else:
+        flash('Lỗi kết nối API', 'danger')
     return redirect(url_for('rooms_types_admin'))
+
 
 
 @app.route('/rooms_types_admin/edit/<int:ma_loai>', methods=['POST'])
 @require_admin
 def rooms_types_admin_edit(ma_loai):
-    ten_loai = request.form.get('ten_loai', '').strip()
-    gia_tien = request.form.get('gia_tien', '').strip()
-    so_nguoi = request.form.get('so_nguoi', '').strip()
-    mo_ta = request.form.get('mo_ta', '').strip()
-    trang_thai = request.form.get('trang_thai', 'Hiển thị')
+    data = {
+        'ten_loai': request.form.get('ten_loai', '').strip(),
+        'gia_tien': request.form.get('gia_tien', '').strip(),
+        'so_nguoi': request.form.get('so_nguoi', '').strip(),
+        'mo_ta': request.form.get('mo_ta', '').strip(),
+        'trang_thai': request.form.get('trang_thai')
+    }
 
-    conn = get_db()
-    try:
-        conn.execute(
-            "UPDATE LOAIPHONG SET TenLoai=?, GiaTien=?, SoNguoiToiDa=?, MoTa=?, TrangThai=? WHERE MaLoai=?",
-            (ten_loai, int(gia_tien), int(so_nguoi), mo_ta, trang_thai, ma_loai)
-        )
-        conn.commit()
+    res = call_api(f'/room-types/edit/{ma_loai}', method='POST', data=data)
+    if res and res.get('status') == 'success':
         flash('Cập nhật loại phòng thành công!', 'success')
-    except Exception as e:
-        flash(f'Lỗi: {str(e)}', 'danger')
-    finally:
-        conn.close()
+    else:
+        flash('Lỗi kết nối API', 'danger')
     return redirect(url_for('rooms_types_admin'))
+
 
 
 @app.route('/rooms_types_admin/toggle/<int:ma_loai>', methods=['POST'])
 @require_admin
 def rooms_types_admin_toggle(ma_loai):
-    conn = get_db()
-    try:
-        rt = conn.execute("SELECT TrangThai FROM LOAIPHONG WHERE MaLoai=?", (ma_loai,)).fetchone()
-        if rt:
-            new_status = 'Ẩn' if rt['TrangThai'] == 'Hiển thị' else 'Hiển thị'
-            conn.execute("UPDATE LOAIPHONG SET TrangThai=? WHERE MaLoai=?", (new_status, ma_loai))
-            conn.commit()
-            return jsonify({'success': True, 'new_status': new_status})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-    finally:
-        conn.close()
-    return jsonify({'success': False})
+    res = call_api(f'/room-types/toggle/{ma_loai}', method='POST')
+    if res and res.get('status') == 'success':
+        return jsonify({'success': True, 'new_status': res.get('new_status')})
+    return jsonify({'success': False, 'error': 'Lỗi API'})
+
 
 
 # --- Quản lý ảnh loại phòng ---
 @app.route('/rooms_types_admin/<int:ma_loai>/images')
 @require_admin
 def room_type_images(ma_loai):
-    conn = get_db()
-    images = conn.execute(
-        "SELECT * FROM HINHANH_LOAIPHONG WHERE MaLoai=? ORDER BY LaAnhDaiDien DESC, ThuTu ASC",
-        (ma_loai,)
-    ).fetchall()
-    room_type = conn.execute("SELECT * FROM LOAIPHONG WHERE MaLoai=?", (ma_loai,)).fetchone()
-    conn.close()
-    return jsonify({
-        'images': [dict(img) for img in images],
-        'room_type': dict(room_type) if room_type else {}
-    })
+    res = call_api(f'/room-types/{ma_loai}/images')
+    if res:
+        return jsonify({
+            'images': res.get('images', []),
+            'room_type': res.get('room_type', {})
+        })
+    return jsonify({'images': [], 'room_type': {}})
+
 
 
 @app.route('/rooms_types_admin/<int:ma_loai>/images/add', methods=['POST'])
 @require_admin
 def room_type_images_add(ma_loai):
-    hinh_anh = request.form.get('hinh_anh', '').strip()
-    la_anh_dai_dien = int(request.form.get('la_anh_dai_dien', 0))
-    thu_tu = request.form.get('thu_tu', 0)
+    data = {
+        'hinh_anh': request.form.get('hinh_anh', '').strip(),
+        'la_anh_dai_dien': int(request.form.get('la_anh_dai_dien', 0)),
+        'thu_tu': request.form.get('thu_tu', 0)
+    }
 
-    if not hinh_anh:
+    if not data['hinh_anh']:
         flash('Vui lòng nhập đường dẫn ảnh!', 'danger')
-        return redirect(url_for('rooms_types_admin'))
-
-    conn = get_db()
-    try:
-        # Nếu đặt làm ảnh đại diện, reset ảnh đại diện cũ
-        if la_anh_dai_dien == 1:
-            conn.execute(
-                "UPDATE HINHANH_LOAIPHONG SET LaAnhDaiDien=0 WHERE MaLoai=?", (ma_loai,)
-            )
-        conn.execute(
-            "INSERT INTO HINHANH_LOAIPHONG (MaLoai, HinhAnh, ThuTu, LaAnhDaiDien) VALUES (?, ?, ?, ?)",
-            (ma_loai, hinh_anh, int(thu_tu), la_anh_dai_dien)
-        )
-        conn.commit()
-        flash('Đã thêm ảnh thành công!', 'success')
-    except Exception as e:
-        flash(f'Lỗi: {str(e)}', 'danger')
-    finally:
-        conn.close()
+    else:
+        res = call_api(f'/room-types/{ma_loai}/images/add', method='POST', data=data)
+        if res and res.get('status') == 'success':
+            flash('Đã thêm ảnh thành công!', 'success')
+        else:
+            flash('Lỗi kết nối API', 'danger')
+            
     return redirect(url_for('rooms_types_admin'))
+
 
 
 @app.route('/rooms_types_admin/images/set_avatar/<int:ma_anh>', methods=['POST'])
 @require_admin
 def room_type_images_set_avatar(ma_anh):
-    conn = get_db()
-    try:
-        img = conn.execute("SELECT MaLoai FROM HINHANH_LOAIPHONG WHERE MaAnh=?", (ma_anh,)).fetchone()
-        if img:
-            conn.execute("UPDATE HINHANH_LOAIPHONG SET LaAnhDaiDien=0 WHERE MaLoai=?", (img['MaLoai'],))
-            conn.execute("UPDATE HINHANH_LOAIPHONG SET LaAnhDaiDien=1 WHERE MaAnh=?", (ma_anh,))
-            conn.commit()
-            return jsonify({'success': True})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-    finally:
-        conn.close()
-    return jsonify({'success': False})
+    res = call_api(f'/room-types/images/set-avatar/{ma_anh}', method='POST')
+    if res and res.get('status') == 'success':
+        return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'Lỗi API'})
+
 
 
 @app.route('/rooms_types_admin/images/delete/<int:ma_anh>', methods=['POST'])
 @require_admin
 def room_type_images_delete(ma_anh):
-    """Xóa ảnh (cho phép xóa thực sự vì ảnh không phải dữ liệu nghiệp vụ quan trọng)."""
-    conn = get_db()
-    try:
-        conn.execute("DELETE FROM HINHANH_LOAIPHONG WHERE MaAnh=?", (ma_anh,))
-        conn.commit()
+    res = call_api(f'/room-types/images/delete/{ma_anh}', method='POST')
+    if res and res.get('status') == 'success':
         return jsonify({'success': True})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-    finally:
-        conn.close()
+    return jsonify({'success': False, 'error': 'Lỗi API'})
+
 
 
 @app.route('/rooms_types_admin/images/reorder', methods=['POST'])
 @require_admin
 def room_type_images_reorder():
-    """Cập nhật thứ tự hiển thị ảnh."""
     data = request.get_json()
-    orders = data.get('orders', [])  # [{ma_anh: 1, thu_tu: 0}, ...]
-    conn = get_db()
-    try:
-        for item in orders:
-            conn.execute(
-                "UPDATE HINHANH_LOAIPHONG SET ThuTu=? WHERE MaAnh=?",
-                (item['thu_tu'], item['ma_anh'])
-            )
-        conn.commit()
+    res = call_api('/room-types/images/reorder', method='POST', data=data)
+    if res and res.get('status') == 'success':
         return jsonify({'success': True})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-    finally:
-        conn.close()
+    return jsonify({'success': False, 'error': 'Lỗi API'})
+
 
 
 # ─────────────────────────────────────────────
@@ -423,96 +295,71 @@ def room_type_images_reorder():
 @app.route('/services_admin')
 @require_admin
 def services_admin():
-    conn = get_db()
-    search = request.args.get('search', '').strip()
-    filter_status = request.args.get('trang_thai', '')
+    params = {
+        'search': request.args.get('search', '').strip(),
+        'trang_thai': request.args.get('trang_thai', '')
+    }
 
-    query = "SELECT * FROM DICHVU WHERE 1=1"
-    params = []
-    if search:
-        query += " AND (TenDV LIKE ? OR MoTa LIKE ?)"
-        params += [f'%{search}%', f'%{search}%']
-    if filter_status:
-        query += " AND TrangThai = ?"
-        params.append(filter_status)
-    query += " ORDER BY TenDV"
-
-    services = conn.execute(query, params).fetchall()
-    conn.close()
+    res = call_api('/services_admin', params=params)
     return render_template('admin/services_admin.html',
-                           services=services,
-                           search=search, filter_status=filter_status)
+                           services=res.get('services', []) if res else [],
+                           search=params['search'], filter_status=params['trang_thai'])
+
 
 
 @app.route('/services_admin/add', methods=['POST'])
 @require_admin
 def services_admin_add():
-    ten_dv = request.form.get('ten_dv', '').strip()
-    mo_ta = request.form.get('mo_ta', '').strip()
-    gia_tien = request.form.get('gia_tien', '').strip()
-    thay_doi_sl = int(request.form.get('thay_doi_sl', 0))
-    hinh_anh = request.form.get('hinh_anh', '').strip()
+    data = {
+        'ten_dv': request.form.get('ten_dv', '').strip(),
+        'mo_ta': request.form.get('mo_ta', '').strip(),
+        'gia_tien': request.form.get('gia_tien', '').strip(),
+        'thay_doi_sl': int(request.form.get('thay_doi_sl', 0)),
+        'hinh_anh': request.form.get('hinh_anh', '').strip()
+    }
 
-    if not ten_dv or not gia_tien:
-        flash('Vui lòng nhập đầy đủ thông tin bắt buộc!', 'danger')
+    if not data['ten_dv'] or not data['gia_tien']:
+        flash('Vui lòng nhập đầy đủ thông tin!', 'danger')
         return redirect(url_for('services_admin'))
 
-    conn = get_db()
-    try:
-        conn.execute(
-            "INSERT INTO DICHVU (TenDV, MoTa, GiaTien, ThayDoiSL, TrangThai, HinhAnh) VALUES (?, ?, ?, ?, 'Đang có', ?)",
-            (ten_dv, mo_ta, int(gia_tien), thay_doi_sl, hinh_anh or None)
-        )
-        conn.commit()
-        flash(f'Đã thêm dịch vụ "{ten_dv}" thành công!', 'success')
-    except Exception as e:
-        flash(f'Lỗi: {str(e)}', 'danger')
-    finally:
-        conn.close()
+    res = call_api('/services/add', method='POST', data=data)
+    if res and res.get('status') == 'success':
+        flash(f"Đã thêm dịch vụ \"{data['ten_dv']}\" thành công!", 'success')
+    else:
+        flash('Lỗi kết nối API', 'danger')
     return redirect(url_for('services_admin'))
+
 
 
 @app.route('/services_admin/edit/<int:ma_dv>', methods=['POST'])
 @require_admin
 def services_admin_edit(ma_dv):
-    ten_dv = request.form.get('ten_dv', '').strip()
-    mo_ta = request.form.get('mo_ta', '').strip()
-    gia_tien = request.form.get('gia_tien', '').strip()
-    thay_doi_sl = int(request.form.get('thay_doi_sl', 0))
-    trang_thai = request.form.get('trang_thai', 'Đang có')
-    hinh_anh = request.form.get('hinh_anh', '').strip()
+    data = {
+        'ten_dv': request.form.get('ten_dv', '').strip(),
+        'mo_ta': request.form.get('mo_ta', '').strip(),
+        'gia_tien': request.form.get('gia_tien', '').strip(),
+        'thay_doi_sl': int(request.form.get('thay_doi_sl', 0)),
+        'trang_thai': request.form.get('trang_thai', 'Đang có'),
+        'hinh_anh': request.form.get('hinh_anh', '').strip()
+    }
 
-    conn = get_db()
-    try:
-        conn.execute(
-            "UPDATE DICHVU SET TenDV=?, MoTa=?, GiaTien=?, ThayDoiSL=?, TrangThai=?, HinhAnh=? WHERE MaDV=?",
-            (ten_dv, mo_ta, int(gia_tien), thay_doi_sl, trang_thai, hinh_anh or None, ma_dv)
-        )
-        conn.commit()
+    res = call_api(f'/services/edit/{ma_dv}', method='POST', data=data)
+    if res and res.get('status') == 'success':
         flash('Cập nhật dịch vụ thành công!', 'success')
-    except Exception as e:
-        flash(f'Lỗi: {str(e)}', 'danger')
-    finally:
-        conn.close()
+    else:
+        flash('Lỗi kết nối API', 'danger')
     return redirect(url_for('services_admin'))
+
 
 
 @app.route('/services_admin/toggle/<int:ma_dv>', methods=['POST'])
 @require_admin
 def services_admin_toggle(ma_dv):
-    conn = get_db()
-    try:
-        svc = conn.execute("SELECT TrangThai FROM DICHVU WHERE MaDV=?", (ma_dv,)).fetchone()
-        if svc:
-            new_status = 'Đang khóa' if svc['TrangThai'] == 'Đang có' else 'Đang có'
-            conn.execute("UPDATE DICHVU SET TrangThai=? WHERE MaDV=?", (new_status, ma_dv))
-            conn.commit()
-            return jsonify({'success': True, 'new_status': new_status})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-    finally:
-        conn.close()
-    return jsonify({'success': False})
+    res = call_api(f'/services/toggle/{ma_dv}', method='POST')
+    if res and res.get('status') == 'success':
+        return jsonify({'success': True, 'new_status': res.get('new_status')})
+    return jsonify({'success': False, 'error': 'Lỗi API'})
+
 
 
 # ─────────────────────────────────────────────
@@ -521,92 +368,63 @@ def services_admin_toggle(ma_dv):
 @app.route('/staffs_admin')
 @require_admin
 def staffs_admin():
-    conn = get_db()
-    search = request.args.get('search', '').strip()
-    filter_role = request.args.get('la_admin', '')
-    filter_status = request.args.get('trang_thai', '')
+    params = {
+        'search': request.args.get('search', '').strip(),
+        'la_admin': request.args.get('la_admin', ''),
+        'trang_thai': request.args.get('trang_thai', '')
+    }
 
-    query = "SELECT * FROM NHANVIEN WHERE 1=1"
-    params = []
-    if search:
-        query += " AND (HoTen LIKE ? OR SDT LIKE ? OR Email LIKE ?)"
-        params += [f'%{search}%', f'%{search}%', f'%{search}%']
-    if filter_role != '':
-        query += " AND LaAdmin = ?"
-        params.append(int(filter_role))
-    if filter_status:
-        query += " AND TrangThai = ?"
-        params.append(filter_status)
-    query += " ORDER BY LaAdmin DESC, HoTen"
-
-    staffs = conn.execute(query, params).fetchall()
-    conn.close()
+    res = call_api('/staffs', params=params)
     return render_template('admin/staffs_admin.html',
-                           staffs=staffs,
-                           search=search, filter_role=filter_role, filter_status=filter_status)
+                           staffs=res.get('staffs', []) if res else [],
+                           search=params['search'], filter_role=params['la_admin'], 
+                           filter_status=params['trang_thai'])
+
 
 
 @app.route('/staffs_admin/add', methods=['POST'])
 @require_admin
 def staffs_admin_add():
-    ho_ten = request.form.get('ho_ten', '').strip()
-    email = request.form.get('email', '').strip()
-    sdt = request.form.get('sdt', '').strip()
-    mat_khau = request.form.get('mat_khau', '').strip()
-    la_admin = int(request.form.get('la_admin', 0))
+    data = {
+        'ho_ten': request.form.get('ho_ten', '').strip(),
+        'email': request.form.get('email', '').strip(),
+        'sdt': request.form.get('sdt', '').strip(),
+        'mat_khau': request.form.get('mat_khau', '').strip(),
+        'la_admin': int(request.form.get('la_admin', 0))
+    }
 
-    if not ho_ten or not sdt or not mat_khau:
-        flash('Vui lòng nhập đầy đủ thông tin bắt buộc!', 'danger')
+    if not data['ho_ten'] or not data['sdt'] or not data['mat_khau']:
+        flash('Vui lòng nhập đầy đủ thông tin!', 'danger')
         return redirect(url_for('staffs_admin'))
 
-    conn = get_db()
-    try:
-        existing = conn.execute("SELECT * FROM NHANVIEN WHERE SDT=?", (sdt,)).fetchone()
-        if existing:
-            flash(f'Số điện thoại "{sdt}" đã được sử dụng!', 'danger')
-        else:
-            conn.execute(
-                "INSERT INTO NHANVIEN (HoTen, Email, SDT, MatKhau, LaAdmin, TrangThai) VALUES (?, ?, ?, ?, ?, 'Hoạt động')",
-                (ho_ten, email, sdt, mat_khau, la_admin)
-            )
-            conn.commit()
-            flash(f'Đã thêm nhân viên "{ho_ten}" thành công!', 'success')
-    except Exception as e:
-        flash(f'Lỗi: {str(e)}', 'danger')
-    finally:
-        conn.close()
+    res = call_api('/staffs/add', method='POST', data=data)
+    if res and res.get('status') == 'success':
+        flash(f"Đã thêm nhân viên \"{data['ho_ten']}\" thành công!", 'success')
+    else:
+        flash('Lỗi kết nối API', 'danger')
     return redirect(url_for('staffs_admin'))
+
 
 
 @app.route('/staffs_admin/edit/<int:ma_nv>', methods=['POST'])
 @require_admin
 def staffs_admin_edit(ma_nv):
-    ho_ten = request.form.get('ho_ten', '').strip()
-    email = request.form.get('email', '').strip()
-    sdt = request.form.get('sdt', '').strip()
-    mat_khau = request.form.get('mat_khau', '').strip()
-    la_admin = int(request.form.get('la_admin', 0))
-    trang_thai = request.form.get('trang_thai', 'Hoạt động')
+    data = {
+        'ho_ten': request.form.get('ho_ten', '').strip(),
+        'email': request.form.get('email', '').strip(),
+        'sdt': request.form.get('sdt', '').strip(),
+        'mat_khau': request.form.get('mat_khau', '').strip(),
+        'la_admin': int(request.form.get('la_admin', 0)),
+        'trang_thai': request.form.get('trang_thai', 'Hoạt động')
+    }
 
-    conn = get_db()
-    try:
-        if mat_khau:
-            conn.execute(
-                "UPDATE NHANVIEN SET HoTen=?, Email=?, SDT=?, MatKhau=?, LaAdmin=?, TrangThai=? WHERE MaNV=?",
-                (ho_ten, email, sdt, mat_khau, la_admin, trang_thai, ma_nv)
-            )
-        else:
-            conn.execute(
-                "UPDATE NHANVIEN SET HoTen=?, Email=?, SDT=?, LaAdmin=?, TrangThai=? WHERE MaNV=?",
-                (ho_ten, email, sdt, la_admin, trang_thai, ma_nv)
-            )
-        conn.commit()
+    res = call_api(f'/staffs/edit/{ma_nv}', method='POST', data=data)
+    if res and res.get('status') == 'success':
         flash('Cập nhật nhân viên thành công!', 'success')
-    except Exception as e:
-        flash(f'Lỗi: {str(e)}', 'danger')
-    finally:
-        conn.close()
+    else:
+        flash('Lỗi kết nối API', 'danger')
     return redirect(url_for('staffs_admin'))
+
 
 
 @app.route('/staffs_admin/toggle/<int:ma_nv>', methods=['POST'])
@@ -616,19 +434,11 @@ def staffs_admin_toggle(ma_nv):
     if session.get('current_user', {}).get('MaTK') == ma_nv:
         return jsonify({'success': False, 'error': 'Không thể khóa tài khoản đang đăng nhập!'})
 
-    conn = get_db()
-    try:
-        nv = conn.execute("SELECT TrangThai FROM NHANVIEN WHERE MaNV=?", (ma_nv,)).fetchone()
-        if nv:
-            new_status = 'Khóa' if nv['TrangThai'] == 'Hoạt động' else 'Hoạt động'
-            conn.execute("UPDATE NHANVIEN SET TrangThai=? WHERE MaNV=?", (new_status, ma_nv))
-            conn.commit()
-            return jsonify({'success': True, 'new_status': new_status})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-    finally:
-        conn.close()
-    return jsonify({'success': False})
+    res = call_api(f'/staffs/toggle/{ma_nv}', method='POST')
+    if res and res.get('status') == 'success':
+        return jsonify({'success': True, 'new_status': res.get('new_status')})
+    return jsonify({'success': False, 'error': 'Lỗi API'})
+
 
 
 # ─────────────────────────────────────────────
@@ -637,101 +447,65 @@ def staffs_admin_toggle(ma_nv):
 @app.route('/customers_admin')
 @require_admin
 def customers_admin():
-    conn = get_db()
-    search = request.args.get('search', '').strip()
-    filter_status = request.args.get('trang_thai', '')
+    params = {
+        'search': request.args.get('search', '').strip(),
+        'trang_thai': request.args.get('trang_thai', '')
+    }
 
-    query = "SELECT * FROM KHACHHANG WHERE 1=1"
-    params = []
-    if search:
-        query += " AND (HoTen LIKE ? OR Email LIKE ? OR SDT LIKE ?)"
-        params += [f'%{search}%', f'%{search}%', f'%{search}%']
-    if filter_status:
-        query += " AND TrangThai = ?"
-        params.append(filter_status)
-    query += " ORDER BY HoTen"
-
-    customers = conn.execute(query, params).fetchall()
-    conn.close()
+    res = call_api('/customers_admin', params=params)
     return render_template('admin/customers_admin.html',
-                           customers=customers,
-                           search=search, filter_status=filter_status)
+                           customers=res.get('customers', []) if res else [],
+                           search=params['search'], filter_status=params['trang_thai'])
+
 
 
 @app.route('/customers_admin/add', methods=['POST'])
 @require_admin
 def customers_admin_add():
-    ho_ten = request.form.get('ho_ten', '').strip()
-    email = request.form.get('email', '').strip()
-    sdt = request.form.get('sdt', '').strip()
-    mat_khau = request.form.get('mat_khau', '').strip()
+    data = {
+        'ho_ten': request.form.get('ho_ten', '').strip(),
+        'email': request.form.get('email', '').strip(),
+        'sdt': request.form.get('sdt', '').strip(),
+        'mat_khau': request.form.get('mat_khau', '').strip()
+    }
 
-    if not ho_ten or not email or not sdt or not mat_khau:
-        flash('Vui lòng nhập đầy đủ thông tin bắt buộc!', 'danger')
+    if not data['ho_ten'] or not data['email'] or not data['sdt'] or not data['mat_khau']:
+        flash('Vui lòng nhập đầy đủ thông tin!', 'danger')
         return redirect(url_for('customers_admin'))
 
-    conn = get_db()
-    try:
-        existing = conn.execute("SELECT * FROM KHACHHANG WHERE Email=?", (email,)).fetchone()
-        if existing:
-            flash(f'Email "{email}" đã được sử dụng!', 'danger')
-        else:
-            conn.execute(
-                "INSERT INTO KHACHHANG (HoTen, Email, SDT, MatKhau, TrangThai) VALUES (?, ?, ?, ?, 'Hoạt động')",
-                (ho_ten, email, sdt, mat_khau)
-            )
-            conn.commit()
-            flash(f'Đã thêm khách hàng "{ho_ten}" thành công!', 'success')
-    except Exception as e:
-        flash(f'Lỗi: {str(e)}', 'danger')
-    finally:
-        conn.close()
+    res = call_api('/customers/add', method='POST', data=data)
+    if res and res.get('status') == 'success':
+        flash(f"Đã thêm khách hàng \"{data['ho_ten']}\" thành công!", 'success')
+    else:
+        flash('Lỗi kết nối API', 'danger')
     return redirect(url_for('customers_admin'))
+
 
 
 @app.route('/customers_admin/edit/<int:ma_kh>', methods=['POST'])
 @require_admin
 def customers_admin_edit(ma_kh):
-    ho_ten = request.form.get('ho_ten', '').strip()
-    email = request.form.get('email', '').strip()
-    sdt = request.form.get('sdt', '').strip()
-    mat_khau = request.form.get('mat_khau', '').strip()
-    trang_thai = request.form.get('trang_thai', 'Hoạt động')
+    data = {
+        'ho_ten': request.form.get('ho_ten', '').strip(),
+        'email': request.form.get('email', '').strip(),
+        'sdt': request.form.get('sdt', '').strip(),
+        'mat_khau': request.form.get('mat_khau', '').strip(),
+        'trang_thai': request.form.get('trang_thai', 'Hoạt động')
+    }
 
-    conn = get_db()
-    try:
-        if mat_khau:
-            conn.execute(
-                "UPDATE KHACHHANG SET HoTen=?, Email=?, SDT=?, MatKhau=?, TrangThai=? WHERE MaKH=?",
-                (ho_ten, email, sdt, mat_khau, trang_thai, ma_kh)
-            )
-        else:
-            conn.execute(
-                "UPDATE KHACHHANG SET HoTen=?, Email=?, SDT=?, TrangThai=? WHERE MaKH=?",
-                (ho_ten, email, sdt, trang_thai, ma_kh)
-            )
-        conn.commit()
+    res = call_api(f'/customers/edit/{ma_kh}', method='POST', data=data)
+    if res and res.get('status') == 'success':
         flash('Cập nhật khách hàng thành công!', 'success')
-    except Exception as e:
-        flash(f'Lỗi: {str(e)}', 'danger')
-    finally:
-        conn.close()
+    else:
+        flash('Lỗi kết nối API', 'danger')
     return redirect(url_for('customers_admin'))
+
 
 
 @app.route('/customers_admin/toggle/<int:ma_kh>', methods=['POST'])
 @require_admin
 def customers_admin_toggle(ma_kh):
-    conn = get_db()
-    try:
-        kh = conn.execute("SELECT TrangThai FROM KHACHHANG WHERE MaKH=?", (ma_kh,)).fetchone()
-        if kh:
-            new_status = 'Khóa' if kh['TrangThai'] == 'Hoạt động' else 'Hoạt động'
-            conn.execute("UPDATE KHACHHANG SET TrangThai=? WHERE MaKH=?", (new_status, ma_kh))
-            conn.commit()
-            return jsonify({'success': True, 'new_status': new_status})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-    finally:
-        conn.close()
-    return jsonify({'success': False})
+    res = call_api(f'/customers/toggle/{ma_kh}', method='POST')
+    if res and res.get('status') == 'success':
+        return jsonify({'success': True, 'new_status': res.get('new_status')})
+    return jsonify({'success': False, 'error': 'Lỗi API'})
