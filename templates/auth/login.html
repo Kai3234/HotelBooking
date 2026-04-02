@@ -4,88 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Đăng nhập - RedHotel</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='/icon/hotel-solid-full.svg') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        :root {
-            --primary-red: #C8102E;
-            --hover-red: #9B0C22;
-            --bg-light: #F4F6F9;
-            --text-main: #2D3436;
-            --white: #FFFFFF;
-            --border-color: #DFE6E9;
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
-        body {
-            background: linear-gradient(135deg, rgba(200,16,46,0.1), rgba(0,0,0,0.05)), url('https://images.unsplash.com/photo-1542314831-c6a4d1409b1c?w=1920') center/cover;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .login-card {
-            background: var(--white);
-            width: 100%;
-            max-width: 420px;
-            padding: 40px 30px;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        }
-
-        .logo-box { text-align: center; margin-bottom: 30px; }
-        .logo-box i { font-size: 36px; color: var(--primary-red); margin-bottom: 10px; }
-        .logo-box h2 { color: var(--text-main); font-size: 24px; }
-        .logo-box p { color: #888; font-size: 14px; margin-top: 5px; }
-
-        /* Nút chọn quyền (Khách / Nhân viên) */
-        .role-selector {
-            display: flex;
-            background: var(--bg-light);
-            border-radius: 8px;
-            padding: 4px;
-            margin-bottom: 25px;
-        }
-        .role-selector label {
-            flex: 1; text-align: center; padding: 10px; font-size: 14px; font-weight: 600;
-            color: #888; cursor: pointer; border-radius: 6px; transition: 0.3s;
-        }
-        .role-selector input[type="radio"] { display: none; }
-        .role-selector input[type="radio"]:checked + label {
-            background: var(--white);
-            color: var(--primary-red);
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-
-        /* Form Inputs */
-        .form-group { margin-bottom: 20px; }
-        .form-label { font-size: 13px; font-weight: 600; color: var(--text-main); margin-bottom: 8px; display: block; }
-        .form-control { width: 100%; padding: 12px 15px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 15px; outline: none; transition: 0.3s; }
-        .form-control:focus { border-color: var(--primary-red); }
-
-        /* Button */
-        .btn-primary {
-            width: 100%; background: var(--primary-red); color: var(--white);
-            padding: 14px; border: none; border-radius: 6px; font-size: 16px;
-            font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px;
-        }
-        .btn-primary:hover { background: var(--hover-red); }
-
-        /* Thống báo lỗi */
-        .alert { padding: 12px 15px; border-radius: 6px; font-size: 14px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
-        .alert-danger { background: #FDE8EA; color: var(--primary-red); border: 1px solid #f5c6cb; }
-        .alert-success { background: #E8FFF3; color: #50CD89; border: 1px solid #bce8f1; }
-
-        .register-link { text-align: center; margin-top: 20px; font-size: 14px; color: #666; }
-        .register-link a { color: var(--primary-red); font-weight: 600; text-decoration: none; }
-        .register-link a:hover { text-decoration: underline; }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles_auth.css') }}">
 </head>
 <body>
 
     <div class="login-card">
         <div class="logo-box">
-            <i class="fa-solid fa-hotel"></i>
+            <a href="/">
+                    <i class="fa-solid fa-hotel"></i>
+            </a>
+
             <h2>RED HOTEL</h2>
             <p>Đăng nhập hệ thống</p>
         </div>
@@ -133,8 +63,15 @@
 
             <!-- Tùy chọn chuyển sang Đăng ký (Dành cho form Khách hàng) -->
             <div class="register-link" id="registerDiv">
-                Chưa có tài khoản? <a href="#">Đăng ký ngay</a>
+                Chưa có tài khoản? <a href="/register">Đăng ký ngay</a>
             </div>
+            <!-- Về trang chủ -->
+            <div class="home-link">
+                <a href="/">
+                    <i class="fa-solid fa-house"></i> Về trang chủ
+                </a>
+            </div>
+
         </form>
     </div>
 

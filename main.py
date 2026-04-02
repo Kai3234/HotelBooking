@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, flash, url_for, session
+from flask import Flask, render_template, request, redirect, flash, url_for, session, get_flashed_messages
 import requests
 
 # Create a flask app
@@ -11,6 +11,7 @@ BASE_URL = 'http://127.0.0.1:5000/'
 
 @app.route('/')
 def index():
+    get_flashed_messages()
     if 'current_user' in session:
         if session['current_user']['ChucVu'] == 'nhanvien':
             if session['current_user']['LaAdmin'] == 1:
@@ -84,6 +85,38 @@ def login():
     return render_template('auth/login.html')
 
 
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    # Kiểm tra nếu đã đăng nhập thì đẩy về trang tương ứng
+    if 'current_user' in session:
+        if session['current_user']['ChucVu'] == 'nhanvien':
+            return redirect(url_for('backend_dashboard'))
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        # Lấy dữ liệu từ form HTML
+        payload = {
+            "fullname": request.form.get('fullname'),
+            "email": request.form.get('email'),
+            "phone": request.form.get('phone'),
+            "password": request.form.get('password')
+        }
+
+        # Gửi yêu cầu đến Backend API
+        try:
+            response = requests.post(f"{BASE_URL}/register", json=payload)
+            result = response.json()
+
+            if result['status'] == 'success':
+                flash(result['message'], 'success')
+                return redirect(url_for('login')) # Chuyển hướng sang đăng nhập
+            else:
+                flash(result['message'], 'danger')
+        except Exception:
+            flash("Không thể kết nối đến hệ thống máy chủ API!", "danger")
+
+    return render_template('auth/register.html')
+
 @app.route('/logout')
 def logout():
     session.pop('current_user', None)  # Xóa dict current_user khỏi session
@@ -92,20 +125,32 @@ def logout():
 
 @app.route('/backend_dashboard')
 def backend_dashboard():
+    get_flashed_messages()
     if 'current_user' in session:
         if session['current_user']['ChucVu'] == 'nhanvien':
             if session['current_user']['LaAdmin'] == 1:
-                return render_template('admin/dashboard_admin.html')
-            return render_template('receptionist/dashboard_rec.html')
-        return render_template('customer/index.html')
-    return render_template('customer/index.html')
+                return redirect(url_for('dashboard_admin'))
+            return redirect(url_for('dashboard_admin'))
+        return redirect(url_for('dashboard_rec'))
+    return redirect(url_for('index'))
 
+@app.route('/mockup/admin')
+def mockup_admin():
+    return render_template('mockup/base_backend_mockup.html')
+
+
+@app.route('/mockup/customer')
+def mockup_dashboard():
+    return render_template('mockup/index_mockup.html')
 
 # Import tất cả các hàm, biến và route
 from admin import *
 from receptionist import *
 from customer import *
 
+
+
+
 if __name__ == '__main__':
     #Đặt cổng khác bởi vì 5000 đã được sử dụng
-    app.run(debug=True, port=5001)
+    app.run(debug=True, port=5001, use_reloader=False)

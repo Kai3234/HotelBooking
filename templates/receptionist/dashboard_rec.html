@@ -1,13 +1,204 @@
 {% extends 'layout/base_backend.html' %}
 
-{% block title %}Dashboard{% endblock %}
+{% block title %}Dashboard Lễ tân{% endblock %}
 
 {% block page_title %}Trang Dashboard{% endblock %}
 
 {% block content %}
-<h2>Chào mừng </h2>
+<style>
+    /* GROUP */
+.widget-info-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 50%;
+}
 
-<div>
-    Đây là nội dung dashboard
+/* ITEM */
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* MAIN KPI (FIRST ITEM) */
+.info-item:first-child {
+    flex-direction: column;
+    align-items: flex-start;
+    border-bottom: 1px dashed var(--border-color);
+    padding-bottom: 6px;
+    margin-bottom: 4px;
+}
+
+/* LABEL */
+.info-label {
+    font-size: 14px;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+/* MAIN VALUE */
+.info-item:first-child .info-value {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--text-dark);
+    line-height: 1.2;
+}
+
+/* SECOND VALUE */
+.info-item:last-child .info-value {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+/* COLOR HELPERS */
+.info-value.red {
+    color: var(--primary-red);
+}
+</style>
+
+<div class="dashboard-receptionist">
+
+    <!-- 1. HÀNG WIDGET THỐNG KÊ NHANH -->
+    <!-- 1. HÀNG 4 WIDGET CARD (MỖI CARD 2 THÔNG SỐ) -->
+    <div class="widget-grid">
+
+        <!-- Card 1: Khách hàng -->
+        <div class="widget-card">
+            <div class="widget-icon red">
+                <i class="fa-solid fa-users"></i>
+            </div>
+            <div class="widget-info-group">
+                <div class="info-item">
+                    <span class="info-label">Đang lưu trú</span>
+                    <span class="info-value">15</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-value">12</span>
+                    <span class="info-label">đặt bằng tài khoản</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 2: Check-in hôm nay -->
+        <div class="widget-card">
+            <div class="widget-icon green">
+                <i class="fa-solid fa-plane-arrival"></i>
+            </div>
+            <div class="widget-info-group">
+                <div class="info-item">
+                    <span class="info-label">Đã Check-in hôm nay</span>
+                    <span class="info-value">08</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-value red">03</span>
+                    <span class="info-label">Chưa Check-in</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 3: Check-out hôm nay -->
+        <div class="widget-card">
+            <div class="widget-icon" style="background: #E1F0FF; color: #009EF7;">
+                <i class="fa-solid fa-plane-departure"></i>
+            </div>
+            <div class="widget-info-group">
+                <div class="info-item">
+                    <span class="info-label">Đã Check-out hôm nay</span>
+                    <span class="info-value">10</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-value" style="color: #009EF7;">04</span>
+                    <span class="info-label">Chưa Check-out</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 4: Trạng thái phòng -->
+        <div class="widget-card">
+            <div class="widget-icon" style="background: #F9F9F9; color: #7E8299;">
+                <i class="fa-solid fa-hotel"></i>
+            </div>
+            <div class="widget-info-group">
+                <div class="info-item">
+                    <span class="info-label">Số phòng trống</span>
+                    <span class="info-value">22</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-value" style="color: #FFA800;">02</span>
+                    <span class="info-label">Đang bảo trì</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 25px; margin-top: 25px;">
+
+        <!-- BẢNG DANH SÁCH CHECK-IN GẦN NHẤT -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="fa-solid fa-clipboard-list" style="margin-right: 10px; color: var(--primary-red);"></i>
+                    Danh sách chờ Check-in (Hôm nay)
+                </div>
+                <button class="btn-sm btn-outline">Xem chi tiết</button>
+            </div>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Mã DP</th>
+                            <th>Khách hàng</th>
+                            <th>Phòng</th>
+                            <th>Dịch vụ</th>
+                            <th>Trạng thái</th>
+                            <th>Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><b>#DP-001</b></td>
+                            <td>Nguyễn Văn An</td>
+                            <td>Phòng 102</td>
+                            <td><small>Ăn sáng, Đón sân bay</small></td>
+                            <td><span class="badge badge-warning">Chờ khách</span></td>
+                            <td><button class="btn-sm btn-primary">Check-in</button></td>
+                        </tr>
+                        <tr>
+                            <td><b>#DP-002</b></td>
+                            <td>Trần Thị B</td>
+                            <td>Phòng 305</td>
+                            <td><small>Không</small></td>
+                            <td><span class="badge badge-success">Đã đặt cọc</span></td>
+                            <td><button class="btn-sm btn-primary">Check-in</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- THÔNG BÁO NHANH/GHI CHÚ CA TRỰC -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Ghi chú ca trực</div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <div style="background: var(--bg-light); padding: 15px; border-radius: 8px; border-left: 4px solid #FFA800;">
+                    <p style="font-size: 13px; font-weight: 600; margin-bottom: 5px;">⚠️ Bảo trì thang máy</p>
+                    <p style="font-size: 12px; color: #666;">Thang máy khu B bảo trì từ 14h - 16h.</p>
+                </div>
+                <div style="background: var(--bg-light); padding: 15px; border-radius: 8px; border-left: 4px solid var(--primary-red);">
+                    <p style="font-size: 13px; font-weight: 600; margin-bottom: 5px;">🔥 Đoàn khách VIP</p>
+                    <p style="font-size: 12px; color: #666;">Đoàn 10 người từ Cty X đến lúc 15h. Chuẩn bị nước uống.</p>
+                </div>
+                <button class="btn btn-outline" style="width: 100%; justify-content: center;">
+                    <i class="fa-solid fa-pen-to-square"></i> Thêm ghi chú
+                </button>
+            </div>
+        </div>
+
+    </div>
 </div>
 {% endblock %}
