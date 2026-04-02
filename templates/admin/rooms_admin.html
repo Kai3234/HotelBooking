@@ -1,13 +1,520 @@
 {% extends 'layout/base_backend.html' %}
-
-{% block title %}Dashboard{% endblock %}
-
-{% block page_title %}Trang Dashboard{% endblock %}
+{% block title %}Quản lý Phòng{% endblock %}
+{% block page_title %}Quản lý Phòng{% endblock %}
 
 {% block content %}
-<h2>Chào mừng </h2>
 
-<div>
-    Đây là nội dung
+{# ── FLASH MESSAGES ── #}
+<div class="flash-messages" id="flashMessages">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }}">
+      <i class="fa-solid {{ 'fa-circle-check' if category == 'success' else 'fa-circle-exclamation' }}"></i>
+      {{ message }}
+      <span class="alert-close" onclick="this.parentElement.remove()">✕</span>
+    </div>
+    {% endfor %}
+  {% endwith %}
 </div>
+
+{# ── TOOLBAR: TÌM KIẾM & BỘ LỌC ── #}
+<div class="card" style="padding:20px 25px;margin-bottom:15px;">
+  <form method="GET" action="/rooms_admin" id="filterForm">
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+
+      {# Ô tìm kiếm #}
+      <div class="search-box" style="flex:1;min-width:200px;">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" name="search" id="searchInput"
+               placeholder="Tìm số phòng, mô tả..."
+               value="{{ search }}" autocomplete="off">
+      </div>
+
+      {# Lọc Tầng #}
+      <select name="tang" id="filterTang" class="filter-select">
+        <option value="">🏢 Tất cả tầng</option>
+        {% for f in floors %}
+        <option value="{{ f.Tang }}" {% if filter_floor == f.Tang|string %}selected{% endif %}>
+          Tầng {{ f.Tang }}
+        </option>
+        {% endfor %}
+      </select>
+
+      {# Lọc Loại phòng #}
+      <select name="ma_loai" id="filterType" class="filter-select">
+        <option value="">🛏 Tất cả loại</option>
+        {% for rt in room_types %}
+        <option value="{{ rt.MaLoai }}" {% if filter_type == rt.MaLoai|string %}selected{% endif %}>
+          {{ rt.TenLoai }}
+        </option>
+        {% endfor %}
+      </select>
+
+      {# Lọc Trạng thái #}
+      <select name="trang_thai" id="filterStatus" class="filter-select">
+        <option value="">📋 Tất cả trạng thái</option>
+        <option value="Sẵn sàng" {% if filter_status == 'Sẵn sàng' %}selected{% endif %}>✅ Sẵn sàng</option>
+        <option value="Bảo trì"  {% if filter_status == 'Bảo trì'  %}selected{% endif %}>🔧 Bảo trì</option>
+        <option value="Khóa"     {% if filter_status == 'Khóa'     %}selected{% endif %}>🔒 Khóa</option>
+      </select>
+
+      {# Nút tìm #}
+      <button type="submit" class="btn btn-primary" style="white-space:nowrap;">
+        <i class="fa-solid fa-magnifying-glass"></i> Tìm kiếm
+      </button>
+
+      {# Nút xóa bộ lọc — chỉ hiện khi đang lọc #}
+      {% if search or filter_floor or filter_type or filter_status %}
+      <a href="/rooms_admin" class="btn btn-outline" style="white-space:nowrap;">
+        <i class="fa-solid fa-rotate-left"></i> Đặt lại
+      </a>
+      {% endif %}
+
+    </div>
+
+    {# Tags hiển thị bộ lọc đang áp dụng #}
+    {% if search or filter_floor or filter_type or filter_status %}
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <span style="font-size:12px;color:var(--text-muted);font-weight:600;">Đang lọc:</span>
+      {% if search %}
+      <span class="badge badge-info">
+        <i class="fa-solid fa-magnifying-glass"></i> "{{ search }}"
+        <a href="{{ url_for('rooms_admin', tang=filter_floor, ma_loai=filter_type, trang_thai=filter_status) }}"
+           style="color:inherit;margin-left:4px;text-decoration:none;font-weight:700;">✕</a>
+      </span>
+      {% endif %}
+      {% if filter_floor %}
+      <span class="badge badge-info">
+        <i class="fa-solid fa-building"></i> Tầng {{ filter_floor }}
+        <a href="{{ url_for('rooms_admin', search=search, ma_loai=filter_type, trang_thai=filter_status) }}"
+           style="color:inherit;margin-left:4px;text-decoration:none;font-weight:700;">✕</a>
+      </span>
+      {% endif %}
+      {% if filter_type %}
+      <span class="badge badge-info">
+        <i class="fa-solid fa-bed"></i>
+        {{ room_types | selectattr('MaLoai', 'equalto', filter_type|int) | map(attribute='TenLoai') | first | default('Loại ' ~ filter_type) }}
+        <a href="{{ url_for('rooms_admin', search=search, tang=filter_floor, trang_thai=filter_status) }}"
+           style="color:inherit;margin-left:4px;text-decoration:none;font-weight:700;">✕</a>
+      </span>
+      {% endif %}
+      {% if filter_status %}
+      <span class="badge {{ 'badge-success' if filter_status == 'Sẵn sàng' else 'badge-warning' }}">
+        {{ filter_status }}
+        <a href="{{ url_for('rooms_admin', search=search, tang=filter_floor, ma_loai=filter_type) }}"
+           style="color:inherit;margin-left:4px;text-decoration:none;font-weight:700;">✕</a>
+      </span>
+      {% endif %}
+      <span style="font-size:12px;color:var(--text-muted);">— {{ rooms|length }} kết quả</span>
+    </div>
+    {% endif %}
+  </form>
+</div>
+
+{# ── BẢNG DỮ LIỆU ── #}
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">
+      Danh sách phòng
+      <span class="count-badge">{{ rooms|length }}</span>
+    </span>
+    <button class="btn btn-primary" onclick="openAddModal()">
+      <i class="fa-solid fa-plus"></i> Thêm phòng
+    </button>
+  </div>
+
+  <div class="table-responsive">
+    <table>
+      <thead>
+        <tr>
+          <th>Số phòng</th>
+          <th>Tầng</th>
+          <th>Loại phòng</th>
+          <th>Mô tả</th>
+          <th>Trạng thái</th>
+          <th style="text-align:right">Thao tác</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for room in rooms %}
+        <tr id="row-{{ room.MaPhong }}">
+          <td>
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;
+                         border-radius:8px;background:var(--light-red);color:var(--primary-red);
+                         font-weight:800;font-size:13px;">
+              {{ room.SoPhong }}
+            </span>
+          </td>
+          <td>
+            <span class="badge badge-secondary">
+              <i class="fa-solid fa-building" style="font-size:10px;"></i> Tầng {{ room.Tang }}
+            </span>
+          </td>
+          <td>{{ room.TenLoai }}</td>
+          <td style="color:var(--text-muted);font-size:13px;max-width:180px;
+                     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            {{ room.MoTa or '—' }}
+          </td>
+          <td>
+            {# Badge trạng thái — click để toggle Sẵn sàng↔Bảo trì (nếu không bị Khóa) #}
+            {% if room.TrangThai == 'Sẵn sàng' %}
+            <span id="badge-{{ room.MaPhong }}"
+                  class="badge badge-toggle badge-success"
+                  onclick="toggleRoom({{ room.MaPhong }})"
+                  title="Nhấn để chuyển → Bảo trì"
+                  style="cursor:pointer;">
+              <i class="fa-solid fa-circle-check"></i> Sẵn sàng
+            </span>
+            {% elif room.TrangThai == 'Bảo trì' %}
+            <span id="badge-{{ room.MaPhong }}"
+                  class="badge badge-toggle badge-warning"
+                  onclick="toggleRoom({{ room.MaPhong }})"
+                  title="Nhấn để chuyển → Sẵn sàng"
+                  style="cursor:pointer;">
+              <i class="fa-solid fa-wrench"></i> Bảo trì
+            </span>
+            {% else %}
+            <span id="badge-{{ room.MaPhong }}"
+                  class="badge badge-danger"
+                  title="Phòng đang bị khóa">
+              <i class="fa-solid fa-lock"></i> Khóa
+            </span>
+            {% endif %}
+          </td>
+          <td style="text-align:right;">
+            <div style="display:flex;gap:5px;justify-content:flex-end;">
+              {# Nút Sửa — ẩn khi đang Khóa #}
+              {% if room.TrangThai != 'Khóa' %}
+              <button class="btn-sm btn-primary btn-edit-room"
+                      data-id="{{ room.MaPhong }}"
+                      data-sophong="{{ room.SoPhong }}"
+                      data-tang="{{ room.Tang }}"
+                      data-maloai="{{ room.MaLoai }}"
+                      data-trangthai="{{ room.TrangThai }}"
+                      data-mota="{{ room.MoTa or '' }}"
+                      title="Sửa phòng">
+                <i class="fa-solid fa-pen"></i> Sửa
+              </button>
+              {% endif %}
+              {# Nút Khóa / Mở khóa #}
+              <button id="lock-btn-{{ room.MaPhong }}"
+                      class="btn-sm {{ 'btn-danger' if room.TrangThai != 'Khóa' else 'btn-success' }}"
+                      onclick="lockRoom({{ room.MaPhong }})"
+                      title="{{ 'Khóa phòng (ẩn khỏi danh sách đặt phòng)' if room.TrangThai != 'Khóa' else 'Mở khóa phòng' }}">
+                <i class="fa-solid {{ 'fa-lock' if room.TrangThai != 'Khóa' else 'fa-lock-open' }}"></i>
+                {{ 'Khóa' if room.TrangThai != 'Khóa' else 'Mở khóa' }}
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6">
+            <div class="empty-state">
+              <i class="fa-solid fa-bed"></i>
+              <p>Không tìm thấy phòng nào{% if search or filter_floor or filter_type or filter_status %} phù hợp với bộ lọc{% endif %}.</p>
+              {% if search or filter_floor or filter_type or filter_status %}
+              <a href="/rooms_admin" style="color:var(--primary-red);font-size:13px;">
+                <i class="fa-solid fa-rotate-left"></i> Xóa bộ lọc và xem tất cả
+              </a>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+{# ══════════════════════════════════════════
+   MODAL THÊM PHÒNG
+══════════════════════════════════════════ #}
+<div class="modal-overlay" id="addModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3><i class="fa-solid fa-plus" style="color:var(--primary-red)"></i> Thêm phòng mới</h3>
+      <button class="btn-close" onclick="closeModal('addModal')">✕</button>
+    </div>
+    <form method="POST" action="/rooms_admin/add">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Số phòng <span class="required">*</span></label>
+            <input type="text" name="so_phong" class="form-control"
+                   placeholder="VD: 101, 202..." required maxlength="10">
+          </div>
+          <div class="form-group">
+            <label>Tầng <span class="required">*</span></label>
+            <input type="number" name="tang" class="form-control"
+                   placeholder="VD: 1" min="1" max="99" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Loại phòng <span class="required">*</span></label>
+            <select name="ma_loai" class="form-control" required>
+              <option value="">-- Chọn loại phòng --</option>
+              {% for rt in room_types %}
+              <option value="{{ rt.MaLoai }}">{{ rt.TenLoai }} — {{ '{:,.0f}'.format(rt.GiaTien) }}₫/đêm</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Trạng thái ban đầu</label>
+            <select name="trang_thai" class="form-control">
+              <option value="Sẵn sàng">✅ Sẵn sàng</option>
+              <option value="Bảo trì">🔧 Bảo trì</option>
+              <option value="Khóa">🔒 Khóa</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Mô tả <small style="color:var(--text-muted)">(tùy chọn)</small></label>
+          <textarea name="mo_ta" class="form-control"
+                    placeholder="VD: View biển trực diện, gần thang máy..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('addModal')">
+          <i class="fa-solid fa-xmark"></i> Hủy
+        </button>
+        <button type="submit" class="btn btn-primary">
+          <i class="fa-solid fa-floppy-disk"></i> Lưu phòng
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+{# ══════════════════════════════════════════
+   MODAL SỬA PHÒNG
+══════════════════════════════════════════ #}
+<div class="modal-overlay" id="editModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3><i class="fa-solid fa-pen" style="color:var(--primary-red)"></i>
+          Sửa phòng <strong id="editModalRoomNo" style="color:var(--primary-red)"></strong>
+      </h3>
+      <button class="btn-close" onclick="closeModal('editModal')">✕</button>
+    </div>
+    <form method="POST" id="editForm">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Số phòng <span class="required">*</span></label>
+            <input type="text" name="so_phong" id="edit_so_phong"
+                   class="form-control" required maxlength="10">
+          </div>
+          <div class="form-group">
+            <label>Tầng <span class="required">*</span></label>
+            <input type="number" name="tang" id="edit_tang"
+                   class="form-control" min="1" max="99" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Loại phòng <span class="required">*</span></label>
+            <select name="ma_loai" id="edit_ma_loai" class="form-control" required>
+              {% for rt in room_types %}
+              <option value="{{ rt.MaLoai }}">{{ rt.TenLoai }} — {{ '{:,.0f}'.format(rt.GiaTien) }}₫/đêm</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Trạng thái</label>
+            <select name="trang_thai" id="edit_trang_thai" class="form-control">
+              <option value="Sẵn sàng">✅ Sẵn sàng</option>
+              <option value="Bảo trì">🔧 Bảo trì</option>
+              <option value="Khóa">🔒 Khóa</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Mô tả <small style="color:var(--text-muted)">(tùy chọn)</small></label>
+          <textarea name="mo_ta" id="edit_mo_ta" class="form-control"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('editModal')">
+          <i class="fa-solid fa-xmark"></i> Hủy
+        </button>
+        <button type="submit" class="btn btn-primary">
+          <i class="fa-solid fa-floppy-disk"></i> Cập nhật
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+/* ── MODAL ── */
+function openAddModal() {
+  document.getElementById('addModal').classList.add('show');
+}
+
+function openEditModal(btn) {
+  const d = btn.dataset;
+  document.getElementById('editForm').action = '/rooms_admin/edit/' + d.id;
+  document.getElementById('editModalRoomNo').textContent = d.sophong;
+  document.getElementById('edit_so_phong').value = d.sophong;
+  document.getElementById('edit_tang').value = d.tang;
+  document.getElementById('edit_ma_loai').value = d.maloai;
+  document.getElementById('edit_trang_thai').value = d.trangthai;
+  document.getElementById('edit_mo_ta').value = d.mota || '';
+  document.getElementById('editModal').classList.add('show');
+}
+
+// Gắn sự kiện cho tất cả nút Sửa qua Event Delegation
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.btn-edit-room');
+  if (btn) openEditModal(btn);
+});
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('show');
+}
+
+// Đóng modal khi click nền tối
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', function(e) {
+    if (e.target === this) closeModal(this.id);
+  });
+});
+
+// Đóng modal bằng ESC
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.show').forEach(m => m.classList.remove('show'));
+});
+
+/* ── TOGGLE TRẠNG THÁI NHANH (Sẵn sàng ↔ Bảo trì) ── */
+async function toggleRoom(id) {
+  const badge = document.getElementById('badge-' + id);
+  const prevHTML = badge.innerHTML;
+  badge.innerHTML = '<span class="spinner"></span>';
+  badge.style.pointerEvents = 'none';
+
+  try {
+    const res = await fetch('/rooms_admin/toggle/' + id, { method: 'POST' });
+    const data = await res.json();
+
+    if (data.success) {
+      const isSan = (data.new_status === 'Sẵn sàng');
+      badge.className = 'badge badge-toggle ' + (isSan ? 'badge-success' : 'badge-warning');
+      badge.innerHTML = `<i class="fa-solid ${isSan ? 'fa-circle-check' : 'fa-wrench'}"></i> ${data.new_status}`;
+      showToast(
+        isSan ? '✅ Phòng đã sẵn sàng!' : '🔧 Phòng chuyển sang bảo trì!',
+        isSan ? 'success' : 'warning'
+      );
+    } else {
+      badge.innerHTML = prevHTML;
+      showToast('⚠️ ' + (data.error || 'Không thể cập nhật'), 'danger');
+    }
+  } catch (err) {
+    badge.innerHTML = prevHTML;
+    showToast('Lỗi kết nối!', 'danger');
+  } finally {
+    badge.style.pointerEvents = '';
+  }
+}
+
+/* ── KHÓA / MỞ KHÓA PHÒNG ── */
+async function lockRoom(id) {
+  const badge = document.getElementById('badge-' + id);
+  const lockBtn = document.getElementById('lock-btn-' + id);
+  const isLocking = (lockBtn.innerText.trim().startsWith('Khóa'));
+
+  if (isLocking && !confirm('Khóa phòng này sẽ ẩn nó khỏi danh sách đặt phòng. Tiếp tục?')) return;
+
+  const prevBadgeHTML = badge.innerHTML;
+  badge.innerHTML = '<span class="spinner"></span>';
+  lockBtn.disabled = true;
+
+  try {
+    const res = await fetch('/rooms_admin/lock/' + id, { method: 'POST' });
+    const data = await res.json();
+
+    if (data.success) {
+      const isLocked = (data.new_status === 'Khóa');
+
+      // Cập nhật badge
+      if (isLocked) {
+        badge.className = 'badge badge-danger';
+        badge.innerHTML = '<i class="fa-solid fa-lock"></i> Khóa';
+        badge.onclick = null;
+        badge.style.cursor = 'default';
+      } else {
+        badge.className = 'badge badge-toggle badge-success';
+        badge.innerHTML = '<i class="fa-solid fa-circle-check"></i> Sẵn sàng';
+        badge.setAttribute('onclick', `toggleRoom(${id})`);
+        badge.style.cursor = 'pointer';
+      }
+
+      // Cập nhật nút Khóa/Mở khóa
+      lockBtn.className = 'btn-sm ' + (isLocked ? 'btn-success' : 'btn-danger');
+      lockBtn.innerHTML = isLocked
+        ? '<i class="fa-solid fa-lock-open"></i> Mở khóa'
+        : '<i class="fa-solid fa-lock"></i> Khóa';
+
+      // Ẩn/hiện nút Sửa (chỉ hiện khi không bị Khóa)
+      const row = document.getElementById('row-' + id);
+      const editBtn = row ? row.querySelector('.btn-edit-room') : null;
+      if (editBtn) editBtn.style.display = isLocked ? 'none' : '';
+
+      showToast(
+        isLocked ? '🔒 Phòng đã bị khóa!' : '🔓 Phòng đã được mở khóa!',
+        isLocked ? 'warning' : 'success'
+      );
+    } else {
+      badge.innerHTML = prevBadgeHTML;
+      showToast('Lỗi: ' + (data.error || 'Không thể thực hiện'), 'danger');
+    }
+  } catch (err) {
+    badge.innerHTML = prevBadgeHTML;
+    showToast('Lỗi kết nối!', 'danger');
+  } finally {
+    lockBtn.disabled = false;
+  }
+}
+
+
+/* ── TOAST NOTIFICATION ── */
+function showToast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.className = `alert alert-${type}`;
+  el.innerHTML = `<i class="fa-solid ${type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'}"></i>
+                  ${msg}
+                  <span class="alert-close" onclick="this.parentElement.remove()">✕</span>`;
+  document.getElementById('flashMessages').appendChild(el);
+  setTimeout(() => el && el.remove(), 4000);
+}
+
+// Auto-dismiss flash messages từ server
+setTimeout(() => {
+  document.querySelectorAll('.flash-messages .alert').forEach(a => a.remove());
+}, 4500);
+
+/* ── REAL-TIME SEARCH (gõ là lọc, 500ms debounce) ── */
+let searchTimer;
+const searchInput = document.getElementById('searchInput');
+searchInput.addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    document.getElementById('filterForm').submit();
+  }, 500);
+});
+
+/* ── CÁC SELECT LỌC TỰ ĐỘNG SUBMIT ── */
+['filterTang', 'filterType', 'filterStatus'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => {
+    document.getElementById('filterForm').submit();
+  });
+});
+</script>
 {% endblock %}

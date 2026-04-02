@@ -112,3 +112,85 @@ tbody tr:hover { background-color: #FAFAFA; }
 .modal-body { padding: 20px; }
 .modal-footer { padding: 20px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px; background: var(--bg-light); border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; }
 @keyframes slideDown { from { transform: translateY(-30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* ================= 4. EXTENSIONS FOR ADMIN PAGES ================= */
+
+/* BADGE MỞ RỘNG */
+.badge-info { background: #EEF6FF; color: #3699FF; }
+.badge-secondary { background: #F3F6F9; color: #7E8299; }
+.badge-purple { background: #F3EFFF; color: #8950FC; }
+
+/* MODAL LỚN */
+.modal-lg { width: 750px; max-width: 95vw; }
+.modal-xl { width: 960px; max-width: 95vw; }
+
+/* SELECT & INPUT bổ sung */
+select.form-control { appearance: none; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 12px center; background-size: 14px; padding-right: 36px; }
+
+/* THUMBNAIL ẢNH */
+.img-thumb { width: 52px; height: 40px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-color); }
+.img-thumb-lg { width: 90px; height: 68px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-color); }
+.img-placeholder { width: 52px; height: 40px; border-radius: 6px; background: var(--bg-light); border: 1px dashed var(--border-color); display: inline-flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 18px; }
+
+/* TOGGLE SWITCH (cập nhật nhanh) */
+.toggle-switch { position: relative; display: inline-block; width: 46px; height: 24px; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; border-radius: 24px; transition: .3s; }
+.toggle-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .3s; }
+input:checked + .toggle-slider { background-color: #50CD89; }
+input:checked + .toggle-slider:before { transform: translateX(22px); }
+.toggle-slider.danger-off { background-color: #F1416C; }
+
+/* BADGE click-able (toggle trực tiếp) */
+.badge-toggle { cursor: pointer; transition: 0.2s; }
+.badge-toggle:hover { opacity: 0.8; transform: scale(1.05); }
+
+/* FLASH MESSAGES */
+.flash-messages { position: fixed; top: 80px; right: 20px; z-index: 99999; display: flex; flex-direction: column; gap: 10px; }
+.alert { padding: 14px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); min-width: 280px; animation: slideInRight 0.3s ease; }
+.alert-success { background: #E8FFF3; color: #50CD89; border-left: 4px solid #50CD89; }
+.alert-danger { background: var(--light-red); color: var(--primary-red); border-left: 4px solid var(--primary-red); }
+.alert-warning { background: #FFF4DE; color: #FFA800; border-left: 4px solid #FFA800; }
+.alert .alert-close { margin-left: auto; cursor: pointer; color: inherit; opacity: 0.6; }
+.alert .alert-close:hover { opacity: 1; }
+@keyframes slideInRight { from { transform: translateX(30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+/* QUẢN LÝ ẢNH */
+.image-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; margin-top: 15px; }
+.image-card { border: 2px solid var(--border-color); border-radius: 8px; overflow: hidden; background: var(--white); transition: 0.2s; cursor: grab; position: relative; }
+.image-card:active { cursor: grabbing; }
+.image-card.is-avatar { border-color: var(--primary-red); }
+.image-card img { width: 100%; height: 90px; object-fit: cover; display: block; }
+.image-card-body { padding: 6px 8px; }
+.image-card .avatar-badge { position: absolute; top: 5px; left: 5px; background: var(--primary-red); color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; }
+.image-card-actions { display: flex; gap: 4px; justify-content: center; padding: 6px; border-top: 1px solid var(--border-color); }
+.sort-handle { color: var(--text-muted); cursor: grab; font-size: 14px; }
+.drag-over { border-color: var(--primary-red) !important; background: var(--light-red); }
+
+/* EMPTY STATE */
+.empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+.empty-state i { font-size: 48px; margin-bottom: 15px; opacity: 0.4; }
+.empty-state p { font-size: 15px; }
+
+/* PREVIEW ẢNH trong modal */
+.img-preview-box { width: 100%; height: 140px; border: 2px dashed var(--border-color); border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: var(--bg-light); margin-top: 8px; }
+.img-preview-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.img-preview-box .placeholder-text { color: var(--text-muted); font-size: 13px; }
+
+/* TOOLBAR bổ sung */
+.toolbar-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.toolbar-right { display: flex; align-items: center; gap: 10px; }
+.filter-select { padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 13px; background: var(--white); outline: none; color: var(--text-dark); cursor: pointer; }
+.filter-select:focus { border-color: var(--primary-red); }
+
+/* SPINNER loading */
+.spinner { width: 18px; height: 18px; border: 2px solid rgba(200,16,46,0.2); border-top-color: var(--primary-red); border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* COUNT BADGE bên cạnh tiêu đề */
+.count-badge { background: var(--light-red); color: var(--primary-red); font-size: 12px; padding: 2px 8px; border-radius: 12px; font-weight: 700; margin-left: 8px; }
+
+/* INPUT GROUP icon */
+.input-group { position: relative; }
+.input-group-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 14px; }
+.input-group .form-control { padding-left: 36px; }

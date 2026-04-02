@@ -1,13 +1,436 @@
 {% extends 'layout/base_backend.html' %}
-
-{% block title %}Dashboard{% endblock %}
-
-{% block page_title %}Trang Dashboard{% endblock %}
+{% block title %}Quản lý Loại Phòng{% endblock %}
+{% block page_title %}Quản lý Loại Phòng <span class="count-badge">{{ room_types|length }}</span>{% endblock %}
 
 {% block content %}
-<h2>Chào mừng </h2>
-
-<div>
-    Đây là nội dung dashboard admin
+<div class="flash-messages" id="flashMessages">
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for category, message in messages %}
+  <div class="alert alert-{{ category }}">
+    <i class="fa-solid {{ 'fa-circle-check' if category == 'success' else 'fa-circle-exclamation' }}"></i>
+    {{ message }}
+    <span class="alert-close" onclick="this.parentElement.remove()">✕</span>
+  </div>
+  {% endfor %}
+{% endwith %}
 </div>
+
+<div class="card">
+  <!-- TOOLBAR TÌM KIẾM & BỘ LỌC -->
+  <div class="toolbar" style="padding:20px 25px;margin-bottom:15px;background:var(--bg-light);border-bottom:1px solid var(--border-color);border-radius:12px 12px 0 0;">
+    <form method="GET" action="/rooms_types_admin" id="searchForm" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;width:100%;">
+      <div class="search-box" style="flex:1;min-width:200px;">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" name="search" placeholder="Tìm tên loại phòng..." value="{{ search }}" id="searchInput" autocomplete="off">
+      </div>
+      <select name="trang_thai" class="filter-select" id="filterStatus">
+        <option value="">📋 Tất cả trạng thái</option>
+        <option value="Hiển thị" {{ 'selected' if filter_status == 'Hiển thị' }}>👁 Hiển thị</option>
+        <option value="Ẩn" {{ 'selected' if filter_status == 'Ẩn' }}>🚫 Ẩn</option>
+      </select>
+      <button type="submit" class="btn btn-primary" style="white-space:nowrap;">
+        <i class="fa-solid fa-magnifying-glass"></i> Tìm kiếm
+      </button>
+      {% if search or filter_status %}
+      <a href="/rooms_types_admin" class="btn btn-outline" style="white-space:nowrap;">
+        <i class="fa-solid fa-rotate-left"></i> Đặt lại
+      </a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- TABLE -->
+  <div class="card-header" style="border-top:none;">
+    <span class="card-title">Danh sách Loại phòng <span class="count-badge">{{ room_types|length }}</span></span>
+    <button class="btn btn-primary" onclick="openAddModal()">
+      <i class="fa-solid fa-plus"></i> Thêm loại phòng
+    </button>
+  </div>
+  <div class="table-responsive">
+    <table>
+      <thead>
+        <tr>
+          <th>Ảnh đại diện</th>
+          <th>Tên loại phòng</th>
+          <th>Giá / đêm</th>
+          <th>Sức chứa</th>
+          <th>Mô tả</th>
+          <th>Trạng thái</th>
+          <th style="text-align:center">Thao tác</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for rt in room_types %}
+        <tr>
+          <td id="avatar-cell-{{ rt.MaLoai }}">
+            {# Hiển thị ảnh đại diện nếu có — được cập nhật JS #}
+            <div class="img-placeholder"><i class="fa-regular fa-image"></i></div>
+          </td>
+          <td><strong>{{ rt.TenLoai }}</strong></td>
+          <td style="color:var(--primary-red);font-weight:700;">{{ '{:,.0f}'.format(rt.GiaTien) }} ₫</td>
+          <td><i class="fa-solid fa-user" style="color:var(--text-muted);font-size:12px;"></i> {{ rt.SoNguoiToiDa }} người</td>
+          <td style="color:var(--text-muted);font-size:13px;">{{ rt.MoTa or '—' }}</td>
+          <td>
+            <span class="badge badge-toggle {{ 'badge-success' if rt.TrangThai == 'Hiển thị' else 'badge-secondary' }}"
+                  id="badge-rt-{{ rt.MaLoai }}"
+                  onclick="toggleRoomType({{ rt.MaLoai }})" title="Nhấn để đổi trạng thái">
+              <i class="fa-solid {{ 'fa-eye' if rt.TrangThai == 'Hiển thị' else 'fa-eye-slash' }}"></i>
+              {{ rt.TrangThai }}
+            </span>
+          </td>
+          <td style="text-align:right">
+            <div style="display:flex;gap:6px;justify-content:flex-end;">
+              <button class="btn-sm btn-primary btn-edit-rt"
+                      data-id="{{ rt.MaLoai }}"
+                      data-tenloai="{{ rt.TenLoai }}"
+                      data-giatien="{{ rt.GiaTien }}"
+                      data-songuoi="{{ rt.SoNguoiToiDa }}"
+                      data-mota="{{ rt.MoTa or '' }}"
+                      data-trangthai="{{ rt.TrangThai }}"
+                      title="Sửa loại phòng">
+                <i class="fa-solid fa-pen"></i> Sửa
+              </button>
+              <button class="btn-sm" style="background:#8950FC;color:white;" onclick="openImagesModal({{ rt.MaLoai }}, '{{ rt.TenLoai }}')" title="Quản lý ảnh">
+                <i class="fa-regular fa-images"></i> Ảnh
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7">
+            <div class="empty-state"><i class="fa-solid fa-layer-group"></i><p>Không có loại phòng nào.</p></div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- MODAL THÊM LOẠI PHÒNG -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3><i class="fa-solid fa-plus" style="color:var(--primary-red)"></i> Thêm loại phòng mới</h3>
+      <button class="btn-close" onclick="closeModal('addModal')">✕</button>
+    </div>
+    <form method="POST" action="/rooms_types_admin/add">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tên loại phòng <span class="required">*</span></label>
+            <input type="text" name="ten_loai" class="form-control" placeholder="VD: Deluxe Hướng Biển" required>
+          </div>
+          <div class="form-group">
+            <label>Sức chứa tối đa <span class="required">*</span></label>
+            <input type="number" name="so_nguoi" class="form-control" placeholder="VD: 2" min="1" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Giá / đêm (VNĐ) <span class="required">*</span></label>
+          <input type="number" name="gia_tien" class="form-control" placeholder="VD: 850000" min="0" required>
+        </div>
+        <div class="form-group">
+          <label>Mô tả</label>
+          <textarea name="mo_ta" class="form-control" placeholder="Mô tả về loại phòng..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('addModal')">Hủy</button>
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Lưu</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL SỬA LOẠI PHÒNG -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3><i class="fa-solid fa-pen" style="color:var(--primary-red)"></i> Sửa loại phòng</h3>
+      <button class="btn-close" onclick="closeModal('editModal')">✕</button>
+    </div>
+    <form method="POST" id="editForm" action="">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tên loại phòng <span class="required">*</span></label>
+            <input type="text" name="ten_loai" id="edit_ten_loai" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Sức chứa tối đa <span class="required">*</span></label>
+            <input type="number" name="so_nguoi" id="edit_so_nguoi" class="form-control" min="1" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Giá / đêm (VNĐ) <span class="required">*</span></label>
+            <input type="number" name="gia_tien" id="edit_gia_tien" class="form-control" min="0" required>
+          </div>
+          <div class="form-group">
+            <label>Trạng thái</label>
+            <select name="trang_thai" id="edit_trang_thai" class="form-control">
+              <option value="Hiển thị">Hiển thị</option>
+              <option value="Ẩn">Ẩn</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Mô tả</label>
+          <textarea name="mo_ta" id="edit_mo_ta" class="form-control"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('editModal')">Hủy</button>
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Cập nhật</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL QUẢN LÝ ẢNH (LOẠI PHÒNG) -->
+<div class="modal-overlay" id="imagesModal">
+  <div class="modal-content modal-xl">
+    <div class="modal-header">
+      <h3><i class="fa-regular fa-images" style="color:#8950FC"></i> Quản lý ảnh — <span id="imgModalTitle"></span></h3>
+      <button class="btn-close" onclick="closeModal('imagesModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <!-- Form thêm ảnh mới -->
+      <form method="POST" id="addImgForm" action="" style="background:var(--bg-light);border-radius:8px;padding:15px;margin-bottom:15px;">
+        <div style="font-weight:600;font-size:14px;margin-bottom:10px;color:var(--text-dark);">
+          <i class="fa-solid fa-plus" style="color:#8950FC"></i> Thêm ảnh mới
+        </div>
+        <div class="form-row" style="margin-bottom:0;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label>Đường dẫn ảnh (URL) <span class="required">*</span></label>
+            <input type="text" name="hinh_anh" id="newImgUrl" class="form-control" placeholder="VD: images/rooms/standard_3.jpg" oninput="previewNewImg(this.value)">
+            <div class="img-preview-box" id="newImgPreview" style="height:80px;margin-top:8px;">
+              <span class="placeholder-text"><i class="fa-regular fa-image"></i> Xem trước ảnh</span>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label>Thứ tự hiển thị</label>
+            <input type="number" name="thu_tu" class="form-control" value="0" min="0">
+            <div style="margin-top:12px;">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+                <input type="checkbox" name="la_anh_dai_dien" value="1" id="chkAvatar" style="width:16px;height:16px;accent-color:var(--primary-red);">
+                Đặt làm <strong>ảnh đại diện</strong>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div style="text-align:right;margin-top:12px;">
+          <button type="submit" class="btn btn-primary" style="padding:8px 18px;">
+            <i class="fa-solid fa-cloud-arrow-up"></i> Thêm ảnh
+          </button>
+        </div>
+      </form>
+
+      <!-- Danh sách ảnh hiện tại -->
+      <div style="font-weight:600;font-size:14px;margin-bottom:10px;color:var(--text-dark);">
+        <i class="fa-solid fa-grip" style="color:var(--text-muted)"></i> Ảnh hiện tại
+        <small style="font-weight:400;color:var(--text-muted);margin-left:6px;">(Kéo thả để sắp xếp)</small>
+      </div>
+      <div class="image-grid" id="imageGrid">
+        <div class="empty-state" style="grid-column:1/-1;">
+          <i class="fa-regular fa-image"></i><p>Đang tải ảnh...</p>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-outline" onclick="closeModal('imagesModal')">Đóng</button>
+      <button type="button" class="btn btn-primary" onclick="saveImageOrder()">
+        <i class="fa-solid fa-sort"></i> Lưu thứ tự
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentRoomTypeId = null;
+
+function openAddModal() { document.getElementById('addModal').classList.add('show'); }
+
+function openEditModal(btn) {
+  const d = btn.dataset;
+  document.getElementById('editForm').action = '/rooms_types_admin/edit/' + d.id;
+  document.getElementById('edit_ten_loai').value = d.tenloai;
+  document.getElementById('edit_gia_tien').value = d.giatien;
+  document.getElementById('edit_so_nguoi').value = d.songuoi;
+  document.getElementById('edit_mo_ta').value = d.mota || '';
+  document.getElementById('edit_trang_thai').value = d.trangthai;
+  document.getElementById('editModal').classList.add('show');
+}
+
+// Event delegation cho nút Sửa
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.btn-edit-rt');
+  if (btn) openEditModal(btn);
+});
+
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => { if (e.target === m) closeModal(m.id); }));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.show').forEach(m => m.classList.remove('show')); });
+
+async function toggleRoomType(id) {
+  const badge = document.getElementById('badge-rt-' + id);
+  badge.innerHTML = '<span class="spinner"></span>';
+  const res = await fetch('/rooms_types_admin/toggle/' + id, { method: 'POST' });
+  const data = await res.json();
+  if (data.success) {
+    const isShow = data.new_status === 'Hiển thị';
+    badge.className = 'badge badge-toggle ' + (isShow ? 'badge-success' : 'badge-secondary');
+    badge.innerHTML = `<i class="fa-solid ${isShow ? 'fa-eye' : 'fa-eye-slash'}"></i> ${data.new_status}`;
+    showToast(isShow ? 'Loại phòng đã hiển thị!' : 'Loại phòng đã ẩn!', isShow ? 'success' : 'warning');
+  }
+}
+
+async function openImagesModal(id, name) {
+  currentRoomTypeId = id;
+  document.getElementById('imgModalTitle').textContent = name;
+  document.getElementById('addImgForm').action = '/rooms_types_admin/' + id + '/images/add';
+  document.getElementById('newImgUrl').value = '';
+  document.getElementById('newImgPreview').innerHTML = '<span class="placeholder-text"><i class="fa-regular fa-image"></i> Xem trước ảnh</span>';
+  document.getElementById('chkAvatar').checked = false;
+  document.getElementById('imagesModal').classList.add('show');
+  await loadImages(id);
+}
+
+async function loadImages(id) {
+  const grid = document.getElementById('imageGrid');
+  grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><span class="spinner" style="width:30px;height:30px;"></span></div>';
+  const res = await fetch('/rooms_types_admin/' + id + '/images');
+  const data = await res.json();
+  renderImageGrid(data.images);
+}
+
+function renderImageGrid(images) {
+  const grid = document.getElementById('imageGrid');
+  if (!images || images.length === 0) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><i class="fa-regular fa-image"></i><p>Chưa có ảnh nào.</p></div>';
+    return;
+  }
+  grid.innerHTML = images.map(img => `
+    <div class="image-card ${img.LaAnhDaiDien ? 'is-avatar' : ''}" data-id="${img.MaAnh}" draggable="true">
+      ${img.LaAnhDaiDien ? '<span class="avatar-badge"><i class="fa-solid fa-star"></i> Đại diện</span>' : ''}
+      <img src="${img.HinhAnh.startsWith('http') ? img.HinhAnh : '/static/' + img.HinhAnh}" alt="room" onerror="this.src='https://placehold.co/130x90?text=No+Image'">
+      <div class="image-card-body" style="font-size:11px;color:var(--text-muted);text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;" title="${img.HinhAnh}">
+        ${img.HinhAnh.split('/').pop()}
+      </div>
+      <div class="image-card-actions">
+        ${!img.LaAnhDaiDien ? `<button class="btn-sm" style="background:#50CD89;color:white;font-size:11px;" onclick="setAvatar(${img.MaAnh})" title="Đặt làm ảnh đại diện"><i class="fa-solid fa-star"></i></button>` : ''}
+        <button class="btn-sm btn-danger" style="font-size:11px;" onclick="deleteImage(${img.MaAnh})" title="Xóa ảnh"><i class="fa-solid fa-trash"></i></button>
+      </div>
+    </div>
+  `).join('');
+  initDragSort();
+}
+
+async function setAvatar(maAnh) {
+  const res = await fetch('/rooms_types_admin/images/set_avatar/' + maAnh, { method: 'POST' });
+  const data = await res.json();
+  if (data.success) {
+    await loadImages(currentRoomTypeId);
+    showToast('Đã đặt làm ảnh đại diện!', 'success');
+    // Reload avatar trong bảng chính
+    loadAvatarCell(currentRoomTypeId);
+  }
+}
+
+async function deleteImage(maAnh) {
+  if (!confirm('Xóa ảnh này?')) return;
+  const res = await fetch('/rooms_types_admin/images/delete/' + maAnh, { method: 'POST' });
+  const data = await res.json();
+  if (data.success) {
+    await loadImages(currentRoomTypeId);
+    showToast('Đã xóa ảnh!', 'success');
+    loadAvatarCell(currentRoomTypeId);
+  }
+}
+
+async function saveImageOrder() {
+  const cards = document.querySelectorAll('#imageGrid .image-card');
+  const orders = Array.from(cards).map((c, i) => ({ ma_anh: parseInt(c.dataset.id), thu_tu: i }));
+  const res = await fetch('/rooms_types_admin/images/reorder', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ orders })
+  });
+  const data = await res.json();
+  if (data.success) showToast('Đã lưu thứ tự ảnh!', 'success');
+}
+
+// Drag & drop sắp xếp
+function initDragSort() {
+  const grid = document.getElementById('imageGrid');
+  let dragEl = null;
+  grid.querySelectorAll('.image-card').forEach(card => {
+    card.addEventListener('dragstart', e => { dragEl = card; card.style.opacity = '0.4'; });
+    card.addEventListener('dragend', () => { dragEl.style.opacity = ''; document.querySelectorAll('.image-card').forEach(c => c.classList.remove('drag-over')); });
+    card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('drag-over'); });
+    card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+    card.addEventListener('drop', e => {
+      e.preventDefault();
+      if (dragEl !== card) grid.insertBefore(dragEl, card);
+      card.classList.remove('drag-over');
+    });
+  });
+}
+
+function previewNewImg(url) {
+  const box = document.getElementById('newImgPreview');
+  if (url) {
+    const src = url.startsWith('http') ? url : '/static/' + url;
+    box.innerHTML = `<img src="${src}" onerror="this.src='https://placehold.co/200x80?text=Lỗi+ảnh'" style="max-height:76px;">`;
+  } else {
+    box.innerHTML = '<span class="placeholder-text"><i class="fa-regular fa-image"></i> Xem trước ảnh</span>';
+  }
+}
+
+// Tải ảnh đại diện vào bảng sau khi cập nhật
+async function loadAvatarCell(id) {
+  const res = await fetch('/rooms_types_admin/' + id + '/images');
+  const data = await res.json();
+  const cell = document.getElementById('avatar-cell-' + id);
+  if (!cell) return;
+  const avatar = data.images.find(i => i.LaAnhDaiDien === 1);
+  if (avatar) {
+    const src = avatar.HinhAnh.startsWith('http') ? avatar.HinhAnh : '/static/' + avatar.HinhAnh;
+    cell.innerHTML = `<img src="${src}" class="img-thumb" onerror="this.src='https://placehold.co/52x40?text=?'" alt="">`;
+  } else {
+    cell.innerHTML = '<div class="img-placeholder"><i class="fa-regular fa-image"></i></div>';
+  }
+}
+
+// Tải toàn bộ ảnh đại diện khi load trang
+document.querySelectorAll('[id^="avatar-cell-"]').forEach(cell => {
+  const id = cell.id.replace('avatar-cell-', '');
+  loadAvatarCell(id);
+});
+
+function showToast(msg, type='success') {
+  const el = document.createElement('div');
+  el.className = `alert alert-${type}`;
+  el.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${msg} <span class="alert-close" onclick="this.parentElement.remove()">✕</span>`;
+  document.getElementById('flashMessages').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+setTimeout(() => document.querySelectorAll('.flash-messages .alert').forEach(a => a.remove()), 4000);
+
+let searchTimer;
+const searchInput = document.getElementById('searchInput');
+searchInput.addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => document.getElementById('searchForm').submit(), 500);
+});
+
+document.getElementById('filterStatus').addEventListener('change', () => {
+  document.getElementById('searchForm').submit();
+});
+</script>
 {% endblock %}
