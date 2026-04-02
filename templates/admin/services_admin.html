@@ -1,13 +1,323 @@
 {% extends 'layout/base_backend.html' %}
-
-{% block title %}Dashboard{% endblock %}
-
-{% block page_title %}Trang Dashboard{% endblock %}
+{% block title %}Quản lý Dịch Vụ{% endblock %}
+{% block page_title %}Quản lý Dịch Vụ <span class="count-badge">{{ services|length }}</span>{% endblock %}
 
 {% block content %}
-<h2>Chào mừng </h2>
-
-<div>
-    Đây là nội dung dashboard admin
+<div class="flash-messages" id="flashMessages">
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for category, message in messages %}
+  <div class="alert alert-{{ category }}">
+    <i class="fa-solid {{ 'fa-circle-check' if category == 'success' else 'fa-circle-exclamation' }}"></i>
+    {{ message }}
+    <span class="alert-close" onclick="this.parentElement.remove()">✕</span>
+  </div>
+  {% endfor %}
+{% endwith %}
 </div>
+
+<div class="card">
+  <!-- TOOLBAR TÌM KIẾM & BỘ LỌC -->
+  <div class="toolbar" style="padding:20px 25px;margin-bottom:15px;background:var(--bg-light);border-bottom:1px solid var(--border-color);border-radius:12px 12px 0 0;">
+    <form method="GET" action="/services_admin" id="searchForm" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;width:100%;">
+      <div class="search-box" style="flex:1;min-width:200px;">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" name="search" placeholder="Tìm tên, mô tả dịch vụ..." value="{{ search }}" id="searchInput" autocomplete="off">
+      </div>
+      <select name="trang_thai" class="filter-select" id="filterStatus">
+        <option value="">📋 Tất cả trạng thái</option>
+        <option value="Đang có" {{ 'selected' if filter_status == 'Đang có' }}>✅ Đang có</option>
+        <option value="Đang khóa" {{ 'selected' if filter_status == 'Đang khóa' }}>🔒 Đang khóa</option>
+      </select>
+      <button type="submit" class="btn btn-primary" style="white-space:nowrap;">
+        <i class="fa-solid fa-magnifying-glass"></i> Tìm kiếm
+      </button>
+      {% if search or filter_status %}
+      <a href="/services_admin" class="btn btn-outline" style="white-space:nowrap;">
+        <i class="fa-solid fa-rotate-left"></i> Đặt lại
+      </a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- TABLE -->
+  <div class="card-header" style="border-top:none;">
+    <span class="card-title">Danh sách Dịch vụ <span class="count-badge">{{ services|length }}</span></span>
+    <button class="btn btn-primary" onclick="openAddModal()">
+      <i class="fa-solid fa-plus"></i> Thêm dịch vụ
+    </button>
+  </div>
+  <div class="table-responsive">
+    <table>
+      <thead>
+        <tr>
+          <th>Ảnh</th>
+          <th>Tên dịch vụ</th>
+          <th>Mô tả</th>
+          <th>Đơn giá</th>
+          <th>Thay đổi SL</th>
+          <th>Trạng thái</th>
+          <th style="text-align:center">Thao tác</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for svc in services %}
+        <tr>
+          <td>
+            {% if svc.HinhAnh %}
+              {% if svc.HinhAnh.startswith('http') %}
+              <img src="{{ svc.HinhAnh }}" class="img-thumb"
+                   onerror="this.onerror=null;this.src='https://placehold.co/52x40?text=?'" alt="{{ svc.TenDV }}">
+              {% else %}
+              <img src="{{ url_for('static', filename=svc.HinhAnh) }}" class="img-thumb"
+                   onerror="this.onerror=null;this.src='https://placehold.co/52x40?text=?'" alt="{{ svc.TenDV }}">
+              {% endif %}
+            {% else %}
+            <div class="img-placeholder"><i class="fa-regular fa-image"></i></div>
+            {% endif %}
+          </td>
+          <td><strong>{{ svc.TenDV }}</strong></td>
+          <td style="color:var(--text-muted);font-size:13px;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ svc.MoTa or '—' }}</td>
+          <td style="color:var(--primary-red);font-weight:700;">{{ '{:,.0f}'.format(svc.GiaTien) }} ₫</td>
+          <td>
+            {% if svc.ThayDoiSL %}
+            <span class="badge badge-info"><i class="fa-solid fa-check"></i> Có</span>
+            {% else %}
+            <span class="badge badge-secondary"><i class="fa-solid fa-minus"></i> Không</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="badge badge-toggle {{ 'badge-success' if svc.TrangThai == 'Đang có' else 'badge-danger' }}"
+                  id="badge-svc-{{ svc.MaDV }}"
+                  onclick="toggleService({{ svc.MaDV }})" title="Nhấn để Khóa/Mở trạng thái"
+                  style="cursor:pointer;">
+              <i class="fa-solid {{ 'fa-circle-check' if svc.TrangThai == 'Đang có' else 'fa-lock' }}"></i>
+              <span id="text-svc-{{ svc.MaDV }}">{{ svc.TrangThai }}</span>
+            </span>
+          </td>
+          <td style="text-align:right">
+            <button class="btn-sm btn-primary btn-edit-service"
+                    data-id="{{ svc.MaDV }}"
+                    data-tendv="{{ svc.TenDV }}"
+                    data-mota="{{ svc.MoTa or '' }}"
+                    data-giatien="{{ svc.GiaTien }}"
+                    data-thaydoisl="{{ svc.ThayDoiSL }}"
+                    data-hinhanh="{{ svc.HinhAnh or '' }}"
+                    data-trangthai="{{ svc.TrangThai }}"
+                    title="Sửa dịch vụ">
+              <i class="fa-solid fa-pen"></i> Sửa
+            </button>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7">
+            <div class="empty-state"><i class="fa-solid fa-bell-concierge"></i><p>Không có dịch vụ nào.</p></div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- MODAL THÊM DỊCH VỤ -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal-content modal-lg">
+    <div class="modal-header">
+      <h3><i class="fa-solid fa-plus" style="color:var(--primary-red)"></i> Thêm dịch vụ mới</h3>
+      <button class="btn-close" onclick="closeModal('addModal')">✕</button>
+    </div>
+    <form method="POST" action="/services_admin/add">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tên dịch vụ <span class="required">*</span></label>
+            <input type="text" name="ten_dv" class="form-control" placeholder="VD: Buffet Sáng" required>
+          </div>
+          <div class="form-group">
+            <label>Đơn giá (VNĐ) <span class="required">*</span></label>
+            <input type="number" name="gia_tien" class="form-control" placeholder="VD: 150000" min="0" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Mô tả</label>
+          <textarea name="mo_ta" class="form-control" placeholder="Mô tả ngắn về dịch vụ..."></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Đường dẫn ảnh đại diện</label>
+            <input type="text" name="hinh_anh" class="form-control" placeholder="VD: images/services/buffet.jpg" id="addImgUrl" oninput="previewImg(this.value,'addImgPreview')">
+            <div class="img-preview-box" id="addImgPreview" style="height:80px;margin-top:8px;">
+              <span class="placeholder-text"><i class="fa-regular fa-image"></i> Xem trước</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Cho phép thay đổi số lượng?</label>
+            <div style="display:flex;gap:15px;margin-top:10px;">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                <input type="radio" name="thay_doi_sl" value="1" style="accent-color:var(--primary-red)"> Có
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                <input type="radio" name="thay_doi_sl" value="0" checked style="accent-color:var(--primary-red)"> Không
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('addModal')">Hủy</button>
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Lưu</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL SỬA DỊCH VỤ -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal-content modal-lg">
+    <div class="modal-header">
+      <h3><i class="fa-solid fa-pen" style="color:var(--primary-red)"></i> Sửa dịch vụ</h3>
+      <button class="btn-close" onclick="closeModal('editModal')">✕</button>
+    </div>
+    <form method="POST" id="editForm" action="">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tên dịch vụ <span class="required">*</span></label>
+            <input type="text" name="ten_dv" id="edit_ten_dv" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>Đơn giá (VNĐ) <span class="required">*</span></label>
+            <input type="number" name="gia_tien" id="edit_gia_tien" class="form-control" min="0" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Mô tả</label>
+          <textarea name="mo_ta" id="edit_mo_ta" class="form-control"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Đường dẫn ảnh đại diện</label>
+            <input type="text" name="hinh_anh" id="edit_hinh_anh" class="form-control" oninput="previewImg(this.value,'editImgPreview')">
+            <div class="img-preview-box" id="editImgPreview" style="height:80px;margin-top:8px;">
+              <span class="placeholder-text"><i class="fa-regular fa-image"></i> Xem trước</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Cho phép thay đổi số lượng?</label>
+            <div style="display:flex;gap:15px;margin-top:10px;" id="editSLGroup">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                <input type="radio" name="thay_doi_sl" value="1" style="accent-color:var(--primary-red)"> Có
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                <input type="radio" name="thay_doi_sl" value="0" style="accent-color:var(--primary-red)"> Không
+              </label>
+            </div>
+            <div style="margin-top:15px;">
+              <label>Trạng thái</label>
+              <select name="trang_thai" id="edit_trang_thai" class="form-control" style="margin-top:8px;">
+                <option value="Đang có">Đang có</option>
+                <option value="Đang khóa">Đang khóa</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('editModal')">Hủy</button>
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Cập nhật</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function openAddModal() { document.getElementById('addModal').classList.add('show'); }
+
+function openEditModal(btn) {
+  const d = btn.dataset;
+  document.getElementById('editForm').action = '/services_admin/edit/' + d.id;
+  document.getElementById('edit_ten_dv').value = d.tendv;
+  document.getElementById('edit_mo_ta').value = d.mota || '';
+  document.getElementById('edit_gia_tien').value = d.giatien;
+  document.getElementById('edit_hinh_anh').value = d.hinhanh || '';
+  document.getElementById('edit_trang_thai').value = d.trangthai;
+  previewImg(d.hinhanh, 'editImgPreview');
+  // set radio
+  document.querySelectorAll('#editSLGroup input[name="thay_doi_sl"]').forEach(r => r.checked = (r.value == d.thaydoisl));
+  document.getElementById('editModal').classList.add('show');
+}
+
+// Event delegation cho nút Sửa
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.btn-edit-service');
+  if (btn) openEditModal(btn);
+});
+
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => { if (e.target === m) closeModal(m.id); }));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.show').forEach(m => m.classList.remove('show')); });
+
+async function toggleService(id) {
+  const badge = document.getElementById('badge-svc-' + id);
+  const prevHTML = badge.innerHTML;
+  badge.innerHTML = '<span class="spinner"></span>';
+  badge.style.pointerEvents = 'none';
+
+  try {
+    const res = await fetch('/services_admin/toggle/' + id, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      const isOn = data.new_status === 'Đang có';
+      badge.className = 'badge badge-toggle ' + (isOn ? 'badge-success' : 'badge-danger');
+      badge.innerHTML = `<i class="fa-solid ${isOn ? 'fa-circle-check' : 'fa-lock'}"></i> <span id="text-svc-${id}">${data.new_status}</span>`;
+      
+      const btn = document.querySelector(`.btn-edit-service[data-id="${id}"]`);
+      if(btn) btn.dataset.trangthai = data.new_status;
+
+      showToast(isOn ? 'Dịch vụ đã mở!' : 'Dịch vụ đã khóa!', isOn ? 'success' : 'warning');
+    } else if (data.error) {
+      badge.innerHTML = prevHTML;
+      showToast(data.error, 'danger');
+    }
+  } catch(e) {
+    badge.innerHTML = prevHTML;
+    showToast('Lỗi kết nối!', 'danger');
+  } finally {
+    badge.style.pointerEvents = '';
+  }
+}
+
+function previewImg(url, boxId) {
+  const box = document.getElementById(boxId);
+  if (url) {
+    const src = url.startsWith('http') ? url : '/static/' + url;
+    box.innerHTML = `<img src="${src}" onerror="this.src='https://placehold.co/200x80?text=Lỗi+ảnh'" style="max-height:76px;">`;
+  } else {
+    box.innerHTML = '<span class="placeholder-text"><i class="fa-regular fa-image"></i> Xem trước</span>';
+  }
+}
+
+function showToast(msg, type='success') {
+  const el = document.createElement('div');
+  el.className = `alert alert-${type}`;
+  el.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${msg} <span class="alert-close" onclick="this.parentElement.remove()">✕</span>`;
+  document.getElementById('flashMessages').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+setTimeout(() => document.querySelectorAll('.flash-messages .alert').forEach(a => a.remove()), 4000);
+
+let searchTimer;
+const searchInput = document.getElementById('searchInput');
+searchInput.addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => document.getElementById('searchForm').submit(), 500);
+});
+
+document.getElementById('filterStatus').addEventListener('change', () => {
+  document.getElementById('searchForm').submit();
+});
+</script>
 {% endblock %}

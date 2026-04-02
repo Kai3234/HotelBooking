@@ -28,10 +28,20 @@ def login_api():
 
     # --- 1. XỬ LÝ CHO NHÂN VIÊN ---
     if role == 'nhanvien':
-        # Lưu ý: Theo schema trước đó NHANVIEN đăng nhập bằng SDT.
-        # Nếu bạn đã thêm cột Email vào NHANVIEN thì hãy đổi `SDT = ?` thành `Email = ?`
-        query = "SELECT * FROM NHANVIEN WHERE Email = ? AND MatKhau = ?"
-        user = conn.execute(query, (email, password)).fetchone()
+        # Thử đăng nhập bằng Email trước (nếu cột Email tồn tại), fallback về SDT
+        user = None
+        try:
+            user = conn.execute(
+                "SELECT * FROM NHANVIEN WHERE Email = ? AND MatKhau = ?",
+                (email, password)
+            ).fetchone()
+        except Exception:
+            pass
+        if not user:
+            user = conn.execute(
+                "SELECT * FROM NHANVIEN WHERE SDT = ? AND MatKhau = ?",
+                (email, password)
+            ).fetchone()
 
         if user:
             conn.close()
@@ -43,6 +53,8 @@ def login_api():
                     "LaAdmin": user['LaAdmin']
                 }
             })
+
+
 
     # --- 2. XỬ LÝ CHO KHÁCH HÀNG ---
     elif role == 'khachhang':
