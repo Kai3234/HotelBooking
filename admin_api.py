@@ -2,6 +2,8 @@ from datetime import datetime, timedelta
 
 from flask import request, jsonify
 from webapi import app, get_db
+import os
+import uuid
 
 # ─────────────────────────────────────────────
 # 🔹 1. THỐNG KÊ DASHBOARD (STATISTICS)
@@ -167,13 +169,17 @@ def edit_room_api(id):
 def toggle_room_api(id):
     conn = get_db()
     try:
-        room = conn.execute("SELECT TrangThai FROM PHONG WHERE MaPhong=?", (id,)).fetchone()
-        if room:
-            new_status = 'Bảo trì' if room['TrangThai'] == 'Sẵn sàng' else 'Sẵn sàng'
+        phong = conn.execute("SELECT TrangThai FROM PHONG WHERE MaPhong=?", (id,)).fetchone()
+        if phong:
+            # Toggle giữa Sẵn sàng và Bảo trì (chỉ khi không bị Khóa)
+            if phong['TrangThai'] == 'Khóa':
+                return jsonify({"status": "error", "message": "Phòng đang bị khóa, hãy mở khóa trước"}), 400
+                
+            new_status = 'Bảo trì' if phong['TrangThai'] == 'Sẵn sàng' else 'Sẵn sàng'
             conn.execute("UPDATE PHONG SET TrangThai=? WHERE MaPhong=?", (new_status, id))
             conn.commit()
             return jsonify({"status": "success", "new_status": new_status})
-        return jsonify({"status": "error", "message": "Room not found"}), 404
+        return jsonify({"status": "error", "message": "Not found"}), 404
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
     finally:
@@ -183,13 +189,14 @@ def toggle_room_api(id):
 def lock_room_api(id):
     conn = get_db()
     try:
-        room = conn.execute("SELECT TrangThai FROM PHONG WHERE MaPhong=?", (id,)).fetchone()
-        if room:
-            new_status = 'Sẵn sàng' if room['TrangThai'] == 'Khóa' else 'Khóa'
+        phong = conn.execute("SELECT TrangThai FROM PHONG WHERE MaPhong=?", (id,)).fetchone()
+        if phong:
+            # Khóa thì chuyển sang 'Khóa', Mở khóa thì chuyển sang 'Sẵn sàng'
+            new_status = 'Khóa' if phong['TrangThai'] != 'Khóa' else 'Sẵn sàng'
             conn.execute("UPDATE PHONG SET TrangThai=? WHERE MaPhong=?", (new_status, id))
             conn.commit()
             return jsonify({"status": "success", "new_status": new_status})
-        return jsonify({"status": "error", "message": "Room not found"}), 404
+        return jsonify({"status": "error", "message": "Not found"}), 404
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
     finally:
@@ -254,11 +261,17 @@ def toggle_room_type_api(id):
     try:
         rt = conn.execute("SELECT TrangThai FROM LOAIPHONG WHERE MaLoai=?", (id,)).fetchone()
         if rt:
-            new_status = 'Ẩn' if rt['TrangThai'] == 'Hiển thị' else 'Hiển thị'
-            conn.execute("UPDATE PHONG SET TrangThai=? WHERE MaLoai=?", (new_status, id))
-            conn.execute("UPDATE LOAIPHONG SET TrangThai=? WHERE MaLoai=?", (new_status, id))
+            # Xác định trạng thái mới cho Loại phòng
+            new_rt_status = 'Ẩn' if rt['TrangThai'] == 'Hiển thị' else 'Hiển thị'
+            # Xác định trạng thái tương ứng cho các Phòng thuộc loại này
+            new_room_status = 'Khóa' if new_rt_status == 'Ẩn' else 'Sẵn sàng'
+            
+            # Cập nhật cả 2 bảng
+            conn.execute("UPDATE PHONG SET TrangThai=? WHERE MaLoai=?", (new_room_status, id))
+            conn.execute("UPDATE LOAIPHONG SET TrangThai=? WHERE MaLoai=?", (new_rt_status, id))
+            
             conn.commit()
-            return jsonify({"status": "success", "new_status": new_status})
+            return jsonify({"status": "success", "new_status": new_rt_status})
         return jsonify({"status": "error", "message": "Not found"}), 404
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -365,8 +378,8 @@ def add_service_api():
     conn = get_db()
     try:
         conn.execute(
-            "INSERT INTO DICHVU (TenDV, MoTa, GiaTien, ThayDoiSL, TrangThai, HinhAnh) VALUES (?, ?, ?, ?, 'Đang có', ?)",
-            (data['ten_dv'], data.get('mo_ta', ''), int(data['gia_tien']), int(data.get('thay_doi_sl', 0)), data.get('hinh_anh'))
+            "INSERT INTO DICHVU (TenDV, MoTa, GiaTien, ThayDoiSL, TinhTheoNgay, TrangThai, HinhAnh) VALUES (?, ?, ?, ?, ?, 'Đang có', ?)",
+            (data['ten_dv'], data.get('mo_ta', ''), int(data['gia_tien']), int(data.get('thay_doi_sl', 0)), int(data.get('tinh_theo_ngay', 0)), data.get('hinh_anh'))
         )
         conn.commit()
         return jsonify({"status": "success"})
@@ -381,8 +394,8 @@ def edit_service_api(id):
     conn = get_db()
     try:
         conn.execute(
-            "UPDATE DICHVU SET TenDV=?, MoTa=?, GiaTien=?, ThayDoiSL=?, TrangThai=?, HinhAnh=? WHERE MaDV=?",
-            (data['ten_dv'], data.get('mo_ta', ''), int(data['gia_tien']), int(data.get('thay_doi_sl', 0)), data['trang_thai'], data.get('hinh_anh'), id)
+            "UPDATE DICHVU SET TenDV=?, MoTa=?, GiaTien=?, ThayDoiSL=?, TinhTheoNgay=?, TrangThai=?, HinhAnh=? WHERE MaDV=?",
+            (data['ten_dv'], data.get('mo_ta', ''), int(data['gia_tien']), int(data.get('thay_doi_sl', 0)), int(data.get('tinh_theo_ngay', 0)), data['trang_thai'], data.get('hinh_anh'), id)
         )
         conn.commit()
         return jsonify({"status": "success"})
@@ -560,3 +573,39 @@ def toggle_customer_api(id):
         return jsonify({"status": "error", "message": str(e)}), 500
     finally:
         conn.close()
+
+# ─────────────────────────────────────────────
+# 🔹 7. UPLOAD ẢNH (IMAGE UPLOAD)
+# ─────────────────────────────────────────────
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/api/upload_image', methods=['POST'])
+def upload_image_api():
+    if 'file' not in request.files:
+        return jsonify({"status": "error", "message": "Không tìm thấy file"}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"status": "error", "message": "Chưa chọn file"}), 400
+    
+    folder = request.form.get('folder', 'services')
+    upload_folder = f"static/images/{folder}"
+    
+    if file and allowed_file(file.filename):
+        if not os.path.exists(upload_folder):
+            os.makedirs(upload_folder, exist_ok=True)
+            
+        ext = file.filename.rsplit('.', 1)[1].lower()
+        filename = f"{uuid.uuid4().hex}.{ext}"
+        filepath = os.path.join(upload_folder, filename)
+        
+        file.save(filepath)
+        return jsonify({
+            "status": "success",
+            "url": f"images/{folder}/{filename}"
+        })
+    
+    return jsonify({"status": "error", "message": "Định dạng file không hỗ trợ"}), 400

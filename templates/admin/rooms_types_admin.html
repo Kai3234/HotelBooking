@@ -197,36 +197,26 @@
       <button class="btn-close" onclick="closeModal('imagesModal')">✕</button>
     </div>
     <div class="modal-body">
-      <!-- Form thêm ảnh mới -->
-      <form method="POST" id="addImgForm" action="" style="background:var(--bg-light);border-radius:8px;padding:15px;margin-bottom:15px;">
-        <div style="font-weight:600;font-size:14px;margin-bottom:10px;color:var(--text-dark);">
-          <i class="fa-solid fa-plus" style="color:#8950FC"></i> Thêm ảnh mới
+      <div class="drop-zone" id="roomImgDropZone" 
+           onclick="document.getElementById('roomImgFile').click()"
+           ondragover="handleDragOver(event, this)" 
+           ondragleave="handleDragLeave(event, this)" 
+           ondrop="handleDrop(event, this)">
+        <div class="drop-zone-content">
+          <i class="fa-solid fa-images" style="font-size:32px;margin-bottom:10px;color:#8950FC"></i>
+          <p style="font-weight:600;margin-bottom:5px;">Kéo thả ảnh vào đây để tải lên</p>
+          <p style="font-size:12px;color:var(--text-muted);">Hoặc nhấn để chọn file từ máy tính</p>
         </div>
-        <div class="form-row" style="margin-bottom:0;">
-          <div class="form-group" style="margin-bottom:0;">
-            <label>Đường dẫn ảnh (URL) <span class="required">*</span></label>
-            <input type="text" name="hinh_anh" id="newImgUrl" class="form-control" placeholder="VD: images/rooms/standard_3.jpg" oninput="previewNewImg(this.value)">
-            <div class="img-preview-box" id="newImgPreview" style="height:80px;margin-top:8px;">
-              <span class="placeholder-text"><i class="fa-regular fa-image"></i> Xem trước ảnh</span>
-            </div>
-          </div>
-          <div class="form-group" style="margin-bottom:0;">
-            <label>Thứ tự hiển thị</label>
-            <input type="number" name="thu_tu" class="form-control" value="0" min="0">
-            <div style="margin-top:12px;">
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
-                <input type="checkbox" name="la_anh_dai_dien" value="1" id="chkAvatar" style="width:16px;height:16px;accent-color:var(--primary-red);">
-                Đặt làm <strong>ảnh đại diện</strong>
-              </label>
-            </div>
-          </div>
-        </div>
-        <div style="text-align:right;margin-top:12px;">
-          <button type="submit" class="btn btn-primary" style="padding:8px 18px;">
-            <i class="fa-solid fa-cloud-arrow-up"></i> Thêm ảnh
-          </button>
-        </div>
-      </form>
+      </div>
+      <input type="file" id="roomImgFile" style="display:none" accept="image/*" onchange="handleFileSelect(this)">
+      
+      <div style="margin:15px 0;display:flex;align-items:center;justify-content:space-between;background:var(--bg-light);padding:10px 15px;border-radius:8px;">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text-dark);">
+          <input type="checkbox" id="chkAutoAvatar" style="width:18px;height:18px;accent-color:var(--primary-red);">
+          <strong>Đặt làm ảnh đại diện</strong> khi tải lên
+        </label>
+        <div id="uploadStatus" style="font-size:13px;"></div>
+      </div>
 
       <!-- Danh sách ảnh hiện tại -->
       <div style="font-weight:600;font-size:14px;margin-bottom:10px;color:var(--text-dark);">
@@ -292,10 +282,6 @@ async function toggleRoomType(id) {
 async function openImagesModal(id, name) {
   currentRoomTypeId = id;
   document.getElementById('imgModalTitle').textContent = name;
-  document.getElementById('addImgForm').action = '/rooms_types_admin/' + id + '/images/add';
-  document.getElementById('newImgUrl').value = '';
-  document.getElementById('newImgPreview').innerHTML = '<span class="placeholder-text"><i class="fa-regular fa-image"></i> Xem trước ảnh</span>';
-  document.getElementById('chkAvatar').checked = false;
   document.getElementById('imagesModal').classList.add('show');
   await loadImages(id);
 }
@@ -432,5 +418,101 @@ searchInput.addEventListener('input', () => {
 document.getElementById('filterStatus').addEventListener('change', () => {
   document.getElementById('searchForm').submit();
 });
+
+// --- DRAG & DROP & AJAX AUTO-SAVE ---
+function handleDragOver(e, el) { e.preventDefault(); el.classList.add('drag-over'); }
+function handleDragLeave(e, el) { el.classList.remove('drag-over'); }
+function handleDrop(e, el) {
+  e.preventDefault();
+  el.classList.remove('drag-over');
+  const files = e.dataTransfer.files;
+  if (files.length > 0) uploadAndSave(files[0]);
+}
+function handleFileSelect(input) {
+  if (input.files.length > 0) uploadAndSave(input.files[0]);
+}
+
+async function uploadAndSave(file) {
+  if (!file.type.match('image.*')) { showToast('Chỉ hỗ trợ file hình ảnh!', 'danger'); return; }
+  
+  const statusEl = document.getElementById('uploadStatus');
+  statusEl.innerHTML = '<span class="spinner" style="width:16px;height:16px;margin-right:8px;"></span> Đang tải lên...';
+  
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('folder', 'rooms');
+
+  try {
+    // 1. Upload file lên static folder
+    const res = await fetch('/api/upload_image', { method: 'POST', body: formData });
+    const data = await res.json();
+    
+    if (data.status === 'success') {
+      const isAvatar = document.getElementById('chkAutoAvatar').checked ? 1 : 0;
+      
+      // 2. Tự động gọi API lưu vào DB
+      const saveRes = await fetch(`/rooms_types_admin/${currentRoomTypeId}/images/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hinh_anh: data.url,
+          thu_tu: 99, // Cho xuống cuối
+          la_anh_dai_dien: isAvatar
+        })
+      });
+      const saveData = await saveRes.json();
+      
+      if (saveData.status === 'success') {
+        showToast('Đã tải lên và lưu ảnh thành công!', 'success');
+        statusEl.innerHTML = '<span style="color:#50CD89;"><i class="fa-solid fa-check"></i> Hoàn tất!</span>';
+        await loadImages(currentRoomTypeId);
+        if (isAvatar) loadAvatarCell(currentRoomTypeId);
+      } else {
+        showToast('Lỗi khi lưu ảnh vào database!', 'danger');
+        statusEl.innerHTML = '<span style="color:var(--primary-red);">Lỗi lưu DB</span>';
+      }
+    } else {
+      showToast(data.message || 'Lỗi khi tải ảnh', 'danger');
+      statusEl.innerHTML = '<span style="color:var(--primary-red);">Lỗi tải file</span>';
+    }
+  } catch (err) {
+    showToast('Không thể kết nối đến server!', 'danger');
+    statusEl.innerHTML = '<span style="color:var(--primary-red);">Lỗi kết nối</span>';
+  }
+}
 </script>
+
+<style>
+.drop-zone {
+  border: 2px dashed #E1E3EA;
+  border-radius: 12px;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: #F9F9F9;
+}
+.drop-zone:hover, .drop-zone.drag-over {
+  border-color: #8950FC;
+  background: rgba(137, 80, 252, 0.05);
+  color: #8950FC;
+}
+.image-card {
+  position: relative;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: transform 0.2s;
+}
+.image-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+.image-card.is-avatar { border-color: #50CD89; border-width: 2px; }
+.avatar-badge { position: absolute; top: 5px; left: 5px; background: #50CD89; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; z-index: 1; }
+.image-card img { width: 100%; height: 90px; object-fit: cover; }
+.image-card-actions { position: absolute; top: 5px; right: 5px; display: flex; gap: 4px; opacity: 0; transition: opacity 0.2s; }
+.image-card:hover .image-card-actions { opacity: 1; }
+.btn-sm { padding: 4px 8px; border-radius: 4px; border: none; cursor: pointer; }
+.image-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 15px; margin-top: 10px; min-height: 100px; }
+</style>
 {% endblock %}
