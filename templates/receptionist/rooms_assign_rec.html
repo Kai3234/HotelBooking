@@ -1,220 +1,216 @@
 {% extends 'layout/base_backend.html' %}
-
-{% block title %}Quản lý & Gán phòng - RedHotel{% endblock %}
-
-{% block page_title %}Danh sách Đặt phòng & Gán phòng{% endblock %}
+{% block title %}Gán phòng khách sạn - RedHotel{% endblock %}
+{% block page_title %}Tra cứu & Gán phòng cho khách{% endblock %}
 
 {% block content %}
-
-<!-- 1. THANH CÔNG CỤ (TÌM KIẾM & LỌC) -->
+<!-- 1. THANH CÔNG CỤ -->
 <div class="card" style="margin-bottom: 20px; padding: 15px 25px;">
-    <div class="toolbar" style="margin-bottom: 0;">
+    <form method="GET" action="{{ url_for('rooms_assign_rec') }}" class="toolbar">
         <div class="search-box">
             <i class="fa-solid fa-search"></i>
-            <!-- Team Backend: Xử lý request.args.get('search') ở đây -->
-            <input type="text" placeholder="Tìm theo Mã đơn, Tên, SĐT khách...">
+            <input type="text" name="search" value="{{ search_query }}" placeholder="Mã đơn, Mã CT, Tên khách...">
         </div>
         <div class="filter-group">
-            <label style="font-size: 13px; font-weight: 600; color: var(--text-muted);">Trạng thái:</label>
-            <select class="form-control" style="width: 180px; padding: 8px 15px;">
-                <option value="all">Tất cả đơn</option>
-                <option value="cho_gan">Chờ gán phòng</option>
-                <option value="da_gan">Đã gán (Chờ check-in)</option>
-                <option value="dang_o">Đang lưu trú</option>
+            <select name="status" class="form-control" style="width: 180px;">
+                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Tất cả đơn</option>
+                <option value="cho_gan" {% if status_filter == 'cho_gan' %}selected{% endif %}>Chờ gán phòng</option>
+                <option value="da_gan" {% if status_filter == 'da_gan' %}selected{% endif %}>Đã gán (Chờ check-in)</option>
+                <option value="dang_o" {% if status_filter == 'dang_o' %}selected{% endif %}>Đang lưu trú</option>
             </select>
-            <button class="btn btn-primary" style="padding: 8px 15px;"><i class="fa-solid fa-filter"></i> Lọc</button>
+            <button type="submit" class="btn btn-primary">Lọc</button>
         </div>
-    </div>
+    </form>
 </div>
 
-<!-- 2. BẢNG DANH SÁCH ĐƠN ĐẶT PHÒNG -->
+<!-- 2. BẢNG DANH SÁCH -->
 <div class="card">
-    <div class="card-header">
-        <h3 class="card-title">Danh sách cần xử lý hôm nay</h3>
-    </div>
-
     <div class="table-responsive">
         <table>
             <thead>
                 <tr>
-                    <th>Mã Đơn / Chi Tiết</th>
+                    <th>Mã Đơn</th>
                     <th>Khách Hàng</th>
                     <th>Loại Phòng Đặt</th>
-                    <th>Thời Gian Lưu Trú</th>
+                    <th>Lưu Trú</th>
                     <th>Trạng Thái</th>
                     <th>Hành Động</th>
                 </tr>
             </thead>
             <tbody>
-                <!-- TEAM BACKEND: Chạy vòng lặp for item in bookings ở đây -->
-                
-                <!-- DÒNG 1: TRƯỜNG HỢP CHƯA CÓ SỐ PHÒNG (CẦN GÁN PHÒNG) -->
+                {% for b in bookings %}
                 <tr>
+                    <td><strong>#{{ b.MaDP }}</strong><br><small>CT: #{{ b.MaCTDP }}</small></td>
+                    <td><strong>{{ b.HoTen }}</strong><br><small>{{ b.SDT }}</small></td>
                     <td>
-                        <strong>#DP1002</strong><br>
-                        <small style="color: var(--text-muted);">Chi tiết: #CTDP55</small>
+                        <span style="color: var(--primary-red); font-weight: 600;">{{ b.TenLoai }}</span><br>
+                        {% if b.SoPhong %}
+                            <small>Đã gán: <strong>Phòng {{ b.SoPhong }} (Tầng {{ b.Tang }})</strong></small>
+                        {% else %}
+                            <small style="color: red;">Chưa gán phòng</small>
+                        {% endif %}
+                    </td>
+                    <td>{{ b.NgayNhan }} <i class="fa-solid fa-arrow-right"></i> {{ b.NgayTra }}</td>
+                    <td>
+                        {% if b.TrangThaiCT == 'Chờ nhận' %}
+                            {% if not b.MaPhong %}
+                                <span class="badge badge-warning">Chờ gán</span>
+                            {% else %}
+                                <span class="badge badge-info" style="background:#009EF7; color:#fff">Chờ check-in</span>
+                            {% endif %}
+                        {% elif b.TrangThaiCT == 'Đã nhận' %}
+                            <span class="badge badge-success">Đang ở</span>
+                        {% endif %}
                     </td>
                     <td>
-                        <span style="font-weight: 600; color: var(--text-dark);">Lê Văn Khách</span><br>
-                        <small style="color: gray;"><i class="fa-solid fa-phone" style="font-size: 10px;"></i> 0901234567</small>
-                    </td>
-                    <td>
-                        <span style="color: var(--primary-red); font-weight: 600;">Standard Giường Đôi</span><br>
-                        <small style="color: gray;">2 Người lớn</small>
-                    </td>
-                    <td>
-                        <span style="font-weight: 500;">28/03/2026</span> <i class="fa-solid fa-arrow-right" style="font-size: 10px; color: gray; margin: 0 5px;"></i> <span style="font-weight: 500;">29/03/2026</span>
-                    </td>
-                    <td>
-                        <span class="badge badge-warning">Chờ nhận phòng</span>
-                        <div style="font-size: 11px; margin-top: 5px; color: #F1416C;"><i class="fa-solid fa-circle-exclamation"></i> Chưa gán số phòng</div>
-                    </td>
-                    <td>
-                        <!-- Nút này sẽ gọi hàm JS openAssignModal, truyền dữ liệu giả vào -->
-                        <button class="btn-sm btn-success" onclick="openAssignModal('DP1002', 'CTDP55', 'Lê Văn Khách', 'Standard Giường Đôi')">
-                            <i class="fa-solid fa-key"></i> Gán phòng
-                        </button>
+                        {% if b.TrangThaiCT == 'Chờ nhận' %}
+                            {% if not b.MaPhong %}
+                                <!-- TRƯỜNG HỢP: CHƯA CÓ PHÒNG -->
+                                <button class="btn-sm btn-success"
+                                    onclick="openAssignModal('{{ b.MaDP }}', '{{ b.MaCTDP }}', '{{ b.HoTen }}', '{{ b.TenLoai }}', '{{ b.MaLoai }}', '{{ b.NgayNhan }}', '{{ b.NgayTra }}')">
+                                    <i class="fa-solid fa-key"></i> Gán phòng
+                                </button>
+                            {% else %}
+                                <!-- TRƯỜNG HỢP: ĐÃ CÓ PHÒNG -->
+                                <a href="{{ url_for('checkin', ma_ctdp=b.MaCTDP) }}" class="btn-sm btn-primary">
+                                    <i class="fa-solid fa-clipboard-check"></i> Check-in
+                                </a>
+                                <button class="btn-sm btn-outline"
+                                    onclick="openAssignModal('{{ b.MaDP }}', '{{ b.MaCTDP }}', '{{ b.HoTen }}', '{{ b.TenLoai }}', '{{ b.MaLoai }}', '{{ b.NgayNhan }}', '{{ b.NgayTra }}', '{{ b.MaPhong }}')">
+                                    <i class="fa-solid fa-pen"></i> Đổi phòng
+                                </button>
+                            {% endif %}
+                        {% elif b.TrangThaiCT == 'Đã nhận' %}
+                            <!-- Có thể thêm nút Check-out ở đây -->
+                            <small style="color: green;"><i class="fa-solid fa-check"></i> Đã nhận phòng</small>
+                        {% endif %}
                     </td>
                 </tr>
-
-                <!-- DÒNG 2: TRƯỜNG HỢP ĐÃ GÁN PHÒNG (CHỜ KHÁCH ĐẾN CHECK-IN) -->
-                <tr>
-                    <td>
-                        <strong>#DP1003</strong><br>
-                        <small style="color: var(--text-muted);">Chi tiết: #CTDP56</small>
-                    </td>
-                    <td>
-                        <span style="font-weight: 600; color: var(--text-dark);">Trần Thị B</span><br>
-                        <small style="color: gray;"><i class="fa-solid fa-phone" style="font-size: 10px;"></i> 0987654321</small>
-                    </td>
-                    <td>
-                        <span style="color: var(--primary-red); font-weight: 600;">Deluxe Hướng Biển</span><br>
-                        <small style="color: gray;">Đã gán: <strong>Phòng 201</strong></small>
-                    </td>
-                    <td>
-                        <span style="font-weight: 500;">28/03/2026</span> <i class="fa-solid fa-arrow-right" style="font-size: 10px; color: gray; margin: 0 5px;"></i> <span style="font-weight: 500;">30/03/2026</span>
-                    </td>
-                    <td>
-                        <span class="badge badge-success" style="background-color: #E1F0FF; color: #009EF7;">Đã gán phòng</span>
-                    </td>
-                    <td>
-                        <!-- Khi khách đến quầy, bấm Check-in để đổi trạng thái thành "Đang lưu trú" -->
-                        <form action="#" method="POST" style="display:inline;">
-                            <button type="button" class="btn-sm btn-primary">
-                                <i class="fa-solid fa-clipboard-check"></i> Check-in
-                            </button>
-                        </form>
-                        <button class="btn-sm btn-outline"><i class="fa-solid fa-pen"></i> Đổi phòng</button>
-                    </td>
-                </tr>
-
-                <!-- DÒNG 3: TRƯỜNG HỢP KHÁCH ĐANG Ở -->
-                <tr>
-                    <td>
-                        <strong>#DP0995</strong><br>
-                        <small style="color: var(--text-muted);">Chi tiết: #CTDP50</small>
-                    </td>
-                    <td>
-                        <span style="font-weight: 600; color: var(--text-dark);">Lê Đức C</span><br>
-                        <small style="color: gray;"><i class="fa-solid fa-phone" style="font-size: 10px;"></i> 0912345678</small>
-                    </td>
-                    <td>
-                        <span style="color: var(--primary-red); font-weight: 600;">Suite Gia Đình VIP</span><br>
-                        <small style="color: gray;">Đang ở: <strong>Phòng 301</strong></small>
-                    </td>
-                    <td>
-                        <span style="font-weight: 500;">26/03/2026</span> <i class="fa-solid fa-arrow-right" style="font-size: 10px; color: gray; margin: 0 5px;"></i> <span style="font-weight: 500;">29/03/2026</span>
-                    </td>
-                    <td>
-                        <span class="badge badge-success">Đang lưu trú</span>
-                    </td>
-                    <td>
-                        <button class="btn-sm btn-danger" style="background-color: #333;">
-                            <i class="fa-solid fa-right-from-bracket"></i> Check-out
-                        </button>
-                    </td>
-                </tr>
-
+                {% endfor %}
             </tbody>
         </table>
     </div>
-
-    <!-- Phân trang -->
-    <div class="pagination">
-        <div class="page-item"><i class="fa-solid fa-chevron-left"></i></div>
-        <div class="page-item active">1</div>
-        <div class="page-item">2</div>
-        <div class="page-item"><i class="fa-solid fa-chevron-right"></i></div>
-    </div>
 </div>
 
-<!-- ================= 3. MODAL GÁN PHÒNG (POPUP) ================= -->
+<!-- 3. MODAL GÁN PHÒNG -->
 <div class="modal-overlay" id="assignRoomModal">
-    <div class="modal-content" style="width: 550px;">
+    <div class="modal-content">
         <div class="modal-header">
-            <h3><i class="fa-solid fa-key" style="color: var(--primary-red); margin-right: 10px;"></i> Gán Phòng Cho Khách</h3>
-            <button class="btn-close" onclick="closeAssignModal()"><i class="fa-solid fa-xmark"></i></button>
+            <h3>Gán Phòng Thực Tế</h3>
+            <button onclick="closeAssignModal()">&times;</button>
         </div>
-        
-        <!-- Team Backend: Cập nhật route xử lý POST tại đây -->
-        <form action="#" method="POST">
+        <form action="{{ url_for('assign_room') }}" method="POST">
             <div class="modal-body">
-                <!-- Input ẩn lưu Mã Chi tiết đặt phòng để Backend biết đang update phòng nào -->
                 <input type="hidden" name="ma_ctdp" id="input_ma_ctdp">
-
-                <div style="background-color: var(--bg-light); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                    <p style="margin-bottom: 5px;">Mã đơn: <strong id="modal_ma_dp" style="color: var(--primary-red);"></strong></p>
-                    <p style="margin-bottom: 5px;">Khách hàng: <strong id="modal_ten_kh"></strong></p>
-                    <p>Yêu cầu: <strong>Loại phòng <span id="modal_loai_phong"></span></strong></p>
+                <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
+                    <p>Khách: <strong id="modal_ten_kh"></strong></p>
+                    <p>Yêu cầu: <strong id="modal_loai_phong"></strong></p>
                 </div>
-
+                <!-- Select box trong Modal -->
                 <div class="form-group">
-                    <label>Chọn phòng thực tế (Chỉ hiển thị phòng trống & sạch sẽ) <span class="required">*</span></label>
-                    <select class="form-control" name="ma_phong" required>
-                        <option value="">-- Vui lòng chọn số phòng --</option>
-                        
-                        <!-- Team Backend: Loop danh sách phòng có TrangThai = 'Sẵn sàng' VÀ MaLoai tương ứng -->
-                        <optgroup label="Tầng 1">
-                            <option value="1">Phòng 101 - Sẵn sàng</option>
-                            <option value="2">Phòng 102 - Sẵn sàng</option>
-                        </optgroup>
-                        
-                        <!-- Demo phòng không khả dụng để Lễ tân không chọn được -->
-                        <optgroup label="Tầng 2 (Bảo trì / Đang có khách)">
-                            <option value="4" disabled>Phòng 202 - Đang bảo trì</option>
-                        </optgroup>
+                    <label>Chọn phòng trống cho thời gian này:</label>
+                    <select class="form-control" name="ma_phong" id="select_phong_logic" required>
+                        <option value="">-- Chọn phòng --</option>
                     </select>
                 </div>
+
+                <script>
+                    // Dữ liệu từ Server gửi sang
+                    const allRooms = {{ all_rooms | tojson }};
+                    const bookedIntervals = {{ all_booked_intervals | tojson }};
+
+                    function openAssignModal(maDp, maCtdp, tenKhach, loaiPhong, maLoai, ngayNhan, ngayTra) {
+                        document.getElementById('modal_ten_kh').innerText = tenKhach;
+                        document.getElementById('modal_loai_phong').innerText = loaiPhong;
+                        document.getElementById('input_ma_ctdp').value = maCtdp;
+
+                        const select = document.getElementById('select_phong_logic');
+                        select.innerHTML = '<option value="">-- Chọn phòng --</option>';
+
+                        // LOGIC LỌC PHÒNG (Sử dụng logic tương tự API của bạn)
+                        allRooms.forEach(room => {
+                            // 1. Kiểm tra loại phòng
+                            if (room.MaLoai != maLoai) return;
+
+                            // 2. Kiểm tra trạng thái vật lý
+                            if (room.TrangThai === 'Bảo trì') return;
+
+                            // 3. Kiểm tra chồng lấn lịch (Logic overlap)
+                            // Một phòng bị bận nếu: NgayNhan_Moi < NgayTra_Cu AND NgayTra_Moi > NgayNhan_Cu
+                            const isBusy = bookedIntervals.some(booking => {
+                                return booking.MaPhong === room.MaPhong &&
+                                       ngayNhan < booking.NgayTra &&
+                                       ngayTra > booking.NgayNhan;
+                            });
+
+                            if (!isBusy) {
+                                let opt = document.createElement('option');
+                                opt.value = room.MaPhong;
+                                opt.text = `Phòng ${room.SoPhong} (Tầng ${room.Tang})`;
+                                select.appendChild(opt);
+                            }
+                        });
+
+                        document.getElementById('assignRoomModal').classList.add('show');
+                    }
+                </script>
             </div>
-            
             <div class="modal-footer">
-                <button type="button" class="btn btn-outline" onclick="closeAssignModal()">Hủy bỏ</button>
-                <button type="submit" class="btn btn-success"><i class="fa-solid fa-check"></i> Xác nhận Gán Phòng</button>
+                <button type="submit" class="btn btn-success">Xác nhận</button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- ================= SCRIPT ĐIỀU KHIỂN MODAL ================= -->
 <script>
-    // Hàm mở Modal và truyền dữ liệu từ bảng vào Modal
-    function openAssignModal(maDp, maCtdp, tenKhach, loaiPhong) {
-        // Gán text hiển thị
-        document.getElementById('modal_ma_dp').innerText = '#' + maDp;
+    function openAssignModal(maDp, maCtdp, tenKhach, loaiPhong, maLoai, ngayNhan, ngayTra, currentMaPhong = null) {
         document.getElementById('modal_ten_kh').innerText = tenKhach;
         document.getElementById('modal_loai_phong').innerText = loaiPhong;
-        
-        // Gán value cho input hidden để submit form
         document.getElementById('input_ma_ctdp').value = maCtdp;
-        
-        // Hiển thị modal
+
+        const select = document.getElementById('select_phong_logic');
+        if (!select) return;
+
+        select.innerHTML = '<option value="">-- Vui lòng chọn số phòng --</option>';
+
+        allRooms.forEach(room => {
+            // 1. Lọc theo loại phòng
+            if (String(room.MaLoai) !== String(maLoai)) return;
+
+            // 2. Lọc theo trạng thái bảo trì
+            if (room.TrangThai === 'Bảo trì') return;
+
+            // 3. Kiểm tra chồng lấn lịch (Logic Overlap)
+            const isBusy = bookedIntervals.some(booking => {
+                // Chỉ coi là bận nếu:
+                // - Cùng MaPhong
+                // - KHÔNG PHẢI là đơn đặt phòng chúng ta đang xử lý (booking.MaCTDP != maCtdp)
+                // - Và bị trùng ngày
+                return booking.MaPhong === room.MaPhong &&
+                       String(booking.MaCTDP) !== String(maCtdp) &&
+                       ngayNhan < booking.NgayTra &&
+                       ngayTra > booking.NgayNhan;
+            });
+
+            if (!isBusy) {
+                let opt = document.createElement('option');
+                opt.value = room.MaPhong;
+                opt.textContent = `Phòng ${room.SoPhong} (Tầng ${room.Tang})`;
+
+                // Nếu là phòng đang được gán, thì chọn sẵn (Selected)
+                if (currentMaPhong && String(room.MaPhong) === String(currentMaPhong)) {
+                    opt.selected = true;
+                    opt.textContent += " (Hiện tại)";
+                }
+
+                select.appendChild(opt);
+            }
+        });
+
         document.getElementById('assignRoomModal').classList.add('show');
     }
 
-    // Hàm đóng Modal
     function closeAssignModal() {
         document.getElementById('assignRoomModal').classList.remove('show');
     }
 </script>
-
 {% endblock %}
