@@ -49,9 +49,13 @@ def get_single_room_status(ma_phong):
     # 3. Xác định trạng thái logic
     today_str = date.today().isoformat()
 
+    # Ưu tiên kiểm tra các trạng thái vật lý trước
     if room_data['TinhTrangVatLy'] == 'Bảo trì':
         room_data['status_code'] = 'MAINTENANCE'
         room_data['description'] = 'Phòng đang bảo trì'
+    elif room_data['TinhTrangVatLy'] == 'Khóa':
+        room_data['status_code'] = 'LOCKED'
+        room_data['description'] = 'Phòng đang bị khóa'
     elif booking:
         room_data['status_code'] = 'OCCUPIED'
         room_data['customer_name'] = booking['HoTen']
@@ -174,6 +178,28 @@ def api_assign_room():
     conn.close()
     return jsonify({"status": "success"})
 
+
+# API: Hủy gán phòng (đưa MaPhong về NULL)
+@app.route('/api/rec/unassign-room', methods=['POST'])
+def api_unassign_room():
+    data = request.json
+    ma_ctdp = data.get('ma_ctdp')
+
+    if not ma_ctdp:
+        return jsonify({"status": "error", "message": "Thiếu mã chi tiết đặt phòng"}), 400
+
+    conn = get_db()
+    # Chỉ cho phép hủy gán khi phòng chưa Check-in (Trạng thái vẫn là 'Chờ nhận')
+    cursor = conn.cursor()
+    cursor.execute("UPDATE CHITIET_DATPHONG SET MaPhong = NULL WHERE MaCTDP = ? AND TrangThai = 'Chờ nhận'", (ma_ctdp,))
+
+    if cursor.rowcount == 0:
+        conn.close()
+        return jsonify({"status": "error", "message": "Không thể hủy gán (Phòng đã check-in hoặc không tồn tại)"}), 400
+
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": "Đã hủy gán phòng thành công"})
 
 # 4. API Check-in
 @app.route('/api/rec/checkin/<int:ma_ctdp>', methods=['POST'])

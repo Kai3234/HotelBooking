@@ -64,24 +64,32 @@
                     <td>
                         {% if b.TrangThaiCT == 'Chờ nhận' %}
                             {% if not b.MaPhong %}
-                                <!-- TRƯỜNG HỢP: CHƯA CÓ PHÒNG -->
+                                <!-- Nếu chưa gán: Hiện nút gán -->
                                 <button class="btn-sm btn-success"
                                     onclick="openAssignModal('{{ b.MaDP }}', '{{ b.MaCTDP }}', '{{ b.HoTen }}', '{{ b.TenLoai }}', '{{ b.MaLoai }}', '{{ b.NgayNhan }}', '{{ b.NgayTra }}')">
                                     <i class="fa-solid fa-key"></i> Gán phòng
                                 </button>
                             {% else %}
-                                <!-- TRƯỜNG HỢP: ĐÃ CÓ PHÒNG -->
+                                <!-- Nếu đã gán: Hiện Check-in, Đổi phòng và Hủy gán -->
                                 <a href="{{ url_for('checkin', ma_ctdp=b.MaCTDP) }}" class="btn-sm btn-primary">
                                     <i class="fa-solid fa-clipboard-check"></i> Check-in
                                 </a>
+
                                 <button class="btn-sm btn-outline"
                                     onclick="openAssignModal('{{ b.MaDP }}', '{{ b.MaCTDP }}', '{{ b.HoTen }}', '{{ b.TenLoai }}', '{{ b.MaLoai }}', '{{ b.NgayNhan }}', '{{ b.NgayTra }}', '{{ b.MaPhong }}')">
-                                    <i class="fa-solid fa-pen"></i> Đổi phòng
+                                    <i class="fa-solid fa-pen"></i> Đổi
                                 </button>
+
+                                <!-- NÚT HỦY GÁN MỚI THÊM -->
+                                <a href="{{ url_for('unassign_room', ma_ctdp=b.MaCTDP) }}"
+                                   class="btn-sm btn-danger"
+                                   style="background-color: transparent; color: #F1416C; border: 1px solid #F1416C;"
+                                   onclick="return confirm('Bạn có chắc chắn muốn hủy số phòng đã gán cho khách này không?')">
+                                    <i class="fa-solid fa-xmark"></i> Hủy gán
+                                </a>
                             {% endif %}
                         {% elif b.TrangThaiCT == 'Đã nhận' %}
-                            <!-- Có thể thêm nút Check-out ở đây -->
-                            <small style="color: green;"><i class="fa-solid fa-check"></i> Đã nhận phòng</small>
+                            <span class="badge badge-success">Đang ở</span>
                         {% endif %}
                     </td>
                 </tr>
@@ -176,15 +184,13 @@
             // 1. Lọc theo loại phòng
             if (String(room.MaLoai) !== String(maLoai)) return;
 
-            // 2. Lọc theo trạng thái bảo trì
-            if (room.TrangThai === 'Bảo trì') return;
+            // 2. Lọc theo trạng thái vật lý: KHÔNG hiển thị phòng Bảo trì HOẶC Khóa
+            if (room.TrangThai === 'Bảo trì' || room.TrangThai === 'Khóa') {
+                return;
+            }
 
             // 3. Kiểm tra chồng lấn lịch (Logic Overlap)
             const isBusy = bookedIntervals.some(booking => {
-                // Chỉ coi là bận nếu:
-                // - Cùng MaPhong
-                // - KHÔNG PHẢI là đơn đặt phòng chúng ta đang xử lý (booking.MaCTDP != maCtdp)
-                // - Và bị trùng ngày
                 return booking.MaPhong === room.MaPhong &&
                        String(booking.MaCTDP) !== String(maCtdp) &&
                        ngayNhan < booking.NgayTra &&
@@ -196,7 +202,6 @@
                 opt.value = room.MaPhong;
                 opt.textContent = `Phòng ${room.SoPhong} (Tầng ${room.Tang})`;
 
-                // Nếu là phòng đang được gán, thì chọn sẵn (Selected)
                 if (currentMaPhong && String(room.MaPhong) === String(currentMaPhong)) {
                     opt.selected = true;
                     opt.textContent += " (Hiện tại)";

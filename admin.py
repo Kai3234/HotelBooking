@@ -45,10 +45,13 @@ def require_admin(f):
 # 🔹 DASHBOARD ADMIN
 # ─────────────────────────────────────────────
 @app.route('/dashboard_admin')
-@require_admin
+@require_admin  # Đảm bảo bạn đã định nghĩa decorator này
 def dashboard_admin():
+    # Gọi API đã viết ở trên
     res = call_api('/admin/stats')
     stats = res.get('data') if res else {}
+
+    # stats bây giờ sẽ có 2 phần: stats['widget'] và stats['chart']
     return render_template('admin/dashboard_admin.html', stats=stats)
 
 

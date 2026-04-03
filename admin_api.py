@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from flask import request, jsonify
 from webapi import app, get_db
 
@@ -5,22 +7,85 @@ from webapi import app, get_db
 # 🔹 1. THỐNG KÊ DASHBOARD (STATISTICS)
 # ─────────────────────────────────────────────
 @app.route('/api/admin/stats', methods=['GET'])
-def admin_stats():
+def get_admin_stats():
     conn = get_db()
-    try:
-        stats = {
-            'total_rooms': conn.execute("SELECT COUNT(*) FROM PHONG").fetchone()[0],
-            'available_rooms': conn.execute("SELECT COUNT(*) FROM PHONG WHERE TrangThai = 'Sẵn sàng'").fetchone()[0],
-            'total_customers': conn.execute("SELECT COUNT(*) FROM KHACHHANG").fetchone()[0],
-            'total_bookings': conn.execute("SELECT COUNT(*) FROM DATPHONG").fetchone()[0],
-            'pending_bookings': conn.execute("SELECT COUNT(*) FROM DATPHONG WHERE TrangThai = 'Chờ xác nhận'").fetchone()[0],
-            'staying_bookings': conn.execute("SELECT COUNT(*) FROM DATPHONG WHERE TrangThai = 'Đang lưu trú'").fetchone()[0],
+    cursor = conn.cursor()
+
+    # Lấy thời gian hiện tại
+    today = datetime.now().strftime('%Y-%m-%d')
+    first_day_month = datetime.now().replace(day=1).strftime('%Y-%m-%d')
+
+    # 1. Doanh thu tháng hiện tại (DATPHONG)
+    cursor.execute("""
+        SELECT SUM(TongTien) FROM DATPHONG 
+        WHERE NgayTao >= ? AND TrangThai != 'Đã hủy'
+    """, (first_day_month,))
+    revenue_month = cursor.fetchone()[0] or 0
+
+    # 2. Tổng đơn đặt trong tháng
+    cursor.execute("SELECT COUNT(MaDP) FROM DATPHONG WHERE NgayTao >= ?", (first_day_month,))
+    total_bookings = cursor.fetchone()[0] or 0
+
+    # 3. Đơn chờ xác nhận
+    cursor.execute("SELECT COUNT(MaDP) FROM DATPHONG WHERE TrangThai = 'Chờ xác nhận'")
+    pending_confirm = cursor.fetchone()[0] or 0
+
+    # 4. Khách đang lưu trú (Trạng thái đơn)
+    cursor.execute("SELECT COUNT(MaDP) FROM DATPHONG WHERE TrangThai = 'Đang lưu trú'")
+    staying_guests = cursor.fetchone()[0] or 0
+
+    # 5. Phòng sẵn sàng (PHONG)
+    cursor.execute("SELECT COUNT(MaPhong) FROM PHONG WHERE TrangThai = 'Sẵn sàng'")
+    available_rooms = cursor.fetchone()[0] or 0
+
+    # 6. Phòng đang bảo trì
+    cursor.execute("SELECT COUNT(MaPhong) FROM PHONG WHERE TrangThai = 'Bảo trì'")
+    maintenance_rooms = cursor.fetchone()[0] or 0
+
+    # 7. Tổng số khách hàng (KHACHHANG)
+    cursor.execute("SELECT COUNT(MaKH) FROM KHACHHANG")
+    total_customers = cursor.fetchone()[0] or 0
+
+    # 8. Yêu cầu dịch vụ chờ xử lý (DATPHONG_DICHVU)
+    cursor.execute("SELECT COUNT(MaPDV) FROM DATPHONG_DICHVU WHERE TrangThai = 'Chờ xử lý'")
+    pending_services = cursor.fetchone()[0] or 0
+
+    # DỮ LIỆU BIỂU ĐỒ: Doanh thu 7 ngày gần nhất
+    chart_data = []
+    chart_labels = []
+    for i in range(6, -1, -1):
+        day = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
+        cursor.execute("""
+            SELECT SUM(TongTien) FROM DATPHONG 
+            WHERE date(NgayTao) = ? AND TrangThai != 'Đã hủy'
+        """, (day,))
+        row = cursor.fetchone()  # PHẢI CÓ ()
+        val = row[0] if row and row[0] else 0
+        chart_data.append(val)
+        # Chuyển định dạng ngày để hiển thị (ví dụ 03/04)
+        chart_labels.append((datetime.now() - timedelta(days=i)).strftime('%d/%m'))
+
+    conn.close()
+
+    return jsonify({
+        "status": "success",
+        "data": {
+            "widget": {
+                "revenue_month": revenue_month,
+                "total_bookings": total_bookings,
+                "pending_confirm": pending_confirm,
+                "staying_guests": staying_guests,
+                "available_rooms": available_rooms,
+                "maintenance_rooms": maintenance_rooms,
+                "total_customers": total_customers,
+                "pending_services": pending_services
+            },
+            "chart": {
+                "labels": chart_labels,
+                "values": chart_data
+            }
         }
-        return jsonify({"status": "success", "data": stats})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-    finally:
-        conn.close()
+    })
 
 # ─────────────────────────────────────────────
 # 🔹 2. QUẢN LÝ PHÒNG (ROOMS)

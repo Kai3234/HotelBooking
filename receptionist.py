@@ -11,23 +11,28 @@ API_BASE_URL = 'http://127.0.0.1:5000/api/rec'
 def dashboard_rec():
     return render_template('receptionist/dashboard_rec.html')
 
-
-def get_ui_assets(room_data):
+# rooms_layout_rec
+def get_ui_assets(status_data):
     """
-    Hàm phụ trợ để chuyển đổi dữ liệu thô từ API thành
-    class CSS, Icon và Tooltip cho giao diện.
+    Hàm bổ trợ để map dữ liệu từ API sang giao diện
     """
-    status = room_data.get('status_code')
-    is_checkout_today = room_data.get('is_checkout_today', False)
+    code = status_data.get('status_code')
 
-    if status == 'MAINTENANCE':
-        return "status-maintenance", "fa-screwdriver-wrench", "Đang bảo trì"
-    elif status == 'OCCUPIED':
-        icon = "fa-suitcase-rolling" if is_checkout_today else "fa-bed"
-        tooltip = f"Khách: {room_data.get('customer_name')} - Trả: {room_data.get('checkout_booked')}"
-        return "status-occupied", icon, tooltip
-    else:
-        return "status-available", "fa-door-open", "Phòng trống"
+    if code == 'MAINTENANCE':
+        return "status-maintenance", "fa-screwdriver-wrench", "Phòng đang bảo trì"
+
+    if code == 'LOCKED':
+        # Trạng thái phòng bị khóa
+        return "status-locked", "fa-lock", "Phòng đang bị khóa"
+
+    if code == 'OCCUPIED':
+        icon = "fa-bed"
+        if status_data.get('is_checkout_today'):
+            icon = "fa-suitcase-rolling" # Icon trả phòng
+        return "status-occupied", icon, status_data.get('description')
+
+    # Mặc định là phòng trống
+    return "status-available", "fa-door-open", "Phòng trống"
 
 
 @app.route('/rooms_layout_rec', methods=['GET'])
@@ -144,6 +149,20 @@ def checkin(ma_ctdp):
     flash("Khách đã nhận phòng!", "success")
     return redirect(url_for('rooms_assign_rec'))
 
+
+@app.route('/unassign_room/<int:ma_ctdp>')
+def unassign_room(ma_ctdp):
+    # Gọi sang API Server để thực hiện xóa số phòng gán
+    try:
+        res = requests.post(f"{API_BASE_URL}/unassign-room", json={'ma_ctdp': ma_ctdp})
+        if res.status_code == 200:
+            flash("Đã hủy gán phòng thành công!", "success")
+        else:
+            flash("Lỗi: " + res.json().get('message'), "danger")
+    except Exception as e:
+        flash("Lỗi kết nối API: " + str(e), "danger")
+
+    return redirect(url_for('rooms_assign_rec'))
 # End rooms_assign_rec
 
 @app.route('/checkin_rec')

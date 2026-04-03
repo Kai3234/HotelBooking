@@ -50,6 +50,24 @@
     
     /* Badge phụ hiển thị trên Box (VD: Báo khách sắp check-out) */
     .room-badge { position: absolute; top: 0; right: 0; background: var(--primary-red); color: white; font-size: 10px; padding: 2px 5px; border-bottom-left-radius: 6px; font-weight: bold; }
+
+/* Màu cho phòng bị khóa */
+.room-box.status-locked {
+    background-color: #F3F6F9; /* Xám nhạt */
+    border: 2px solid #7E8299; /* Viền xám đậm */
+    color: #3F4254;
+    opacity: 0.8;
+}
+
+.room-box.status-locked .room-icon i {
+    color: #3F4254;
+}
+
+/* Hiệu ứng gạch chéo hoặc mờ nếu muốn nhấn mạnh việc không thể chọn */
+.room-box.status-locked:hover {
+    cursor: not-allowed;
+    transform: none;
+}
 </style>
 
 <!-- ================= 1. BỘ LỌC TÌM KIẾM THEO NGÀY ================= -->
@@ -91,6 +109,8 @@
         <div class="legend-item"><div class="legend-box" style="background-color: #E8FFF3; border-color: #50CD89;"></div> Trống / Sẵn sàng</div>
         <div class="legend-item"><div class="legend-box" style="background-color: var(--light-red); border-color: var(--primary-red);"></div> Đã đặt / Đang ở</div>
         <div class="legend-item"><div class="legend-box" style="background-color: #F5F8FA; border-color: #A1A5B7;"></div> Đang bảo trì</div>
+        <!-- Thêm legend cho Khóa -->
+        <div class="legend-item"><div class="legend-box" style="background-color: #F3F6F9; border-color: #7E8299;"></div> Đã khóa</div>
     </div>
 </div>
 
@@ -127,11 +147,13 @@
     document.querySelectorAll('.room-box').forEach(box => {
         box.addEventListener('click', function() {
             if(this.classList.contains('status-available')) {
-                // Code mẫu: Chuyển hướng sang trang tạo đơn đặt phòng mới
-                // window.location.href = '/tao-don-moi?room=' + this.querySelector('.room-number').innerText;
                 alert('Bạn vừa chọn phòng trống: ' + this.querySelector('.room-number').innerText);
             } else if(this.classList.contains('status-occupied')) {
-                alert('Phòng ' + this.querySelector('.room-number').innerText + ' đang có khách. Vui lòng vào trang Quản lý Đặt phòng để xem chi tiết.');
+                alert('Phòng ' + this.querySelector('.room-number').innerText + ' đang có khách.');
+            } else if(this.classList.contains('status-maintenance')) {
+                alert('Phòng đang bảo trì, không thể sử dụng.');
+            } else if(this.classList.contains('status-locked')) {
+                alert('Phòng đang bị khóa. Vui lòng liên hệ quản lý để mở khóa trước khi sử dụng.');
             }
         });
     });

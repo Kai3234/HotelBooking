@@ -5,9 +5,118 @@
 {% block page_title %}Trang Dashboard{% endblock %}
 
 {% block content %}
-<h2>Chào mừng </h2>
-
-<div>
-    Đây là nội dung dashboard admin
+<!-- 8 Ô THỐNG KÊ -->
+<div class="widget-grid">
+    <div class="widget-card">
+        <div class="widget-icon green"><i class="fa-solid fa-money-bill-trend-up"></i></div>
+        <div class="widget-info">
+            <h4>{{ "{:,.0f}".format(stats.widget.revenue_month or 0) }}₫</h4>
+            <p>Doanh thu tháng</p>
+        </div>
+    </div>
+    <div class="widget-card">
+        <div class="widget-icon red"><i class="fa-solid fa-cart-shopping"></i></div>
+        <div class="widget-info">
+            <h4>{{ stats.widget.total_bookings or 0 }}</h4>
+            <p>Tổng đơn đặt</p>
+        </div>
+    </div>
+    <div class="widget-card">
+        <div class="widget-icon red"><i class="fa-solid fa-clock"></i></div>
+        <div class="widget-info">
+            <h4>{{ stats.widget.pending_confirm or 0 }}</h4>
+            <p>Chờ xác nhận</p>
+        </div>
+    </div>
+    <div class="widget-card">
+        <div class="widget-icon green"><i class="fa-solid fa-user-check"></i></div>
+        <div class="widget-info">
+            <h4>{{ stats.widget.staying_guests or 0 }}</h4>
+            <p>Khách đang ở</p>
+        </div>
+    </div>
+    <div class="widget-card">
+        <div class="widget-icon green"><i class="fa-solid fa-door-open"></i></div>
+        <div class="widget-info">
+            <h4>{{ stats.widget.available_rooms or 0 }}</h4>
+            <p>Phòng sẵn sàng</p>
+        </div>
+    </div>
+    <div class="widget-card">
+        <div class="widget-icon red"><i class="fa-solid fa-screwdriver-wrench"></i></div>
+        <div class="widget-info">
+            <h4>{{ stats.widget.maintenance_rooms or 0 }}</h4>
+            <p>Phòng bảo trì</p>
+        </div>
+    </div>
+    <div class="widget-card">
+        <div class="widget-icon red"><i class="fa-solid fa-users"></i></div>
+        <div class="widget-info">
+            <h4>{{ stats.widget.total_customers or 0 }}</h4>
+            <p>Khách hàng</p>
+        </div>
+    </div>
+    <div class="widget-card">
+        <div class="widget-icon green"><i class="fa-solid fa-concierge-bell"></i></div>
+        <div class="widget-info">
+            <h4>{{ stats.widget.pending_services or 0 }}</h4>
+            <p>Dịch vụ chờ</p>
+        </div>
+    </div>
 </div>
+
+<!-- KHỐI BIỂU ĐỒ (BỔ SUNG PHẦN NÀY) -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">
+            <i class="fa-solid fa-chart-area" style="color: var(--primary-red); margin-right: 10px;"></i>
+            Doanh thu 7 ngày gần nhất
+        </div>
+    </div>
+    <div class="card-body">
+        <div style="position: relative; height: 350px;">
+            <canvas id="revenueChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- SCRIPT BIỂU ĐỒ -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    // Kiểm tra nếu canvas tồn tại mới vẽ để tránh lỗi JS
+    const ctx = document.getElementById('revenueChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            // Sửa stats.chart.labels thành stats.chart['labels']
+            labels: {{ stats.chart['labels'] | tojson }},
+            datasets: [{
+                label: 'Doanh thu (VNĐ)',
+                // Sửa stats.chart.values thành stats.chart['values']
+                data: {{ stats.chart['values'] | tojson }},
+                borderColor: '#C8102E',
+                backgroundColor: 'rgba(200, 16, 46, 0.1)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: (val) => val.toLocaleString('vi-VN') + ' ₫'
+                    }
+                }
+            }
+        }
+    });
+
+</script>
 {% endblock %}
