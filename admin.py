@@ -1,4 +1,5 @@
 import requests
+import uuid
 
 import os
 from flask import session, redirect, render_template, request, url_for, flash, jsonify
@@ -24,6 +25,40 @@ def call_api(endpoint, method='GET', data=None, params=None):
     except Exception as e:
         print(f"API Error ({url}): {str(e)}")
         return None
+
+# ─────────────────────────────────────────────
+# 🔹 UPLOAD ẢNH TRỰC TIẾP (Dành cho AJAX/Fetch)
+# ─────────────────────────────────────────────
+@app.route('/api/upload_image', methods=['POST'])
+def direct_upload_image():
+    if 'file' not in request.files:
+        return jsonify({"status": "error", "message": "Không tìm thấy file"}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"status": "error", "message": "Chưa chọn file"}), 400
+    
+    folder = request.form.get('folder', 'services')
+    # Lưu vào thư mục static của ứng dụng hiện tại (Admin/Main)
+    upload_folder = os.path.join('static', 'images', folder)
+    
+    try:
+        if not os.path.exists(upload_folder):
+            os.makedirs(upload_folder, exist_ok=True)
+            
+        ext = file.filename.rsplit('.', 1)[1].lower()
+        filename = f"{uuid.uuid4().hex}.{ext}"
+        filepath = os.path.join(upload_folder, filename)
+        
+        file.save(filepath)
+        
+        # Trả về URL tương đối cho Frontend
+        return jsonify({
+            "status": "success",
+            "url": f"images/{folder}/{filename}"
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Upload Error: {str(e)}"}), 500
 
 
 
@@ -239,22 +274,26 @@ def room_type_images(ma_loai):
 @app.route('/rooms_types_admin/<int:ma_loai>/images/add', methods=['POST'])
 @require_admin
 def room_type_images_add(ma_loai):
+    # Hỗ trợ cả JSON (AJAX) và Form (truyền thống)
+    if request.is_json:
+        data_in = request.get_json()
+    else:
+        data_in = request.form
+
     data = {
-        'hinh_anh': request.form.get('hinh_anh', '').strip(),
-        'la_anh_dai_dien': int(request.form.get('la_anh_dai_dien', 0)),
-        'thu_tu': request.form.get('thu_tu', 0)
+        'hinh_anh': data_in.get('hinh_anh', '').strip(),
+        'la_anh_dai_dien': int(data_in.get('la_anh_dai_dien', 0)),
+        'thu_tu': int(data_in.get('thu_tu', 0))
     }
 
     if not data['hinh_anh']:
-        flash('Vui lòng nhập đường dẫn ảnh!', 'danger')
-    else:
-        res = call_api(f'/room-types/{ma_loai}/images/add', method='POST', data=data)
-        if res and res.get('status') == 'success':
-            flash('Đã thêm ảnh thành công!', 'success')
-        else:
-            flash('Lỗi kết nối API', 'danger')
-            
-    return redirect(url_for('rooms_types_admin'))
+        return jsonify({"status": "error", "message": "Vui lòng nhập đường dẫn ảnh!"}), 400
+        
+    res = call_api(f'/room-types/{ma_loai}/images/add', method='POST', data=data)
+    if res and res.get('status') == 'success':
+        return jsonify({"status": "success", "message": "Đã thêm ảnh thành công!"})
+    
+    return jsonify({"status": "error", "message": "Lỗi kết nối API Backend"}), 500
 
 
 
@@ -315,6 +354,7 @@ def services_admin_add():
         'mo_ta': request.form.get('mo_ta', '').strip(),
         'gia_tien': request.form.get('gia_tien', '').strip(),
         'thay_doi_sl': int(request.form.get('thay_doi_sl', 0)),
+        'tinh_theo_ngay': int(request.form.get('tinh_theo_ngay', 0)),
         'hinh_anh': request.form.get('hinh_anh', '').strip()
     }
 
@@ -339,6 +379,7 @@ def services_admin_edit(ma_dv):
         'mo_ta': request.form.get('mo_ta', '').strip(),
         'gia_tien': request.form.get('gia_tien', '').strip(),
         'thay_doi_sl': int(request.form.get('thay_doi_sl', 0)),
+        'tinh_theo_ngay': int(request.form.get('tinh_theo_ngay', 0)),
         'trang_thai': request.form.get('trang_thai', 'Đang có'),
         'hinh_anh': request.form.get('hinh_anh', '').strip()
     }

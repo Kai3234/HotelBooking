@@ -55,6 +55,7 @@
           <th>Mô tả</th>
           <th>Đơn giá</th>
           <th>Thay đổi SL</th>
+          <th>Tính theo ngày</th>
           <th>Trạng thái</th>
           <th style="text-align:center">Thao tác</th>
         </tr>
@@ -86,6 +87,13 @@
             {% endif %}
           </td>
           <td>
+            {% if svc.TinhTheoNgay %}
+            <span class="badge badge-warning"><i class="fa-solid fa-calendar-day"></i> Có</span>
+            {% else %}
+            <span class="badge badge-secondary"><i class="fa-solid fa-minus"></i> Không</span>
+            {% endif %}
+          </td>
+          <td>
             <span class="badge badge-toggle {{ 'badge-success' if svc.TrangThai == 'Đang có' else 'badge-danger' }}"
                   id="badge-svc-{{ svc.MaDV }}"
                   onclick="toggleService({{ svc.MaDV }})" title="Nhấn để Khóa/Mở trạng thái"
@@ -101,6 +109,7 @@
                     data-mota="{{ svc.MoTa or '' }}"
                     data-giatien="{{ svc.GiaTien }}"
                     data-thaydoisl="{{ svc.ThayDoiSL }}"
+                    data-tinhtheongay="{{ svc.TinhTheoNgay }}"
                     data-hinhanh="{{ svc.HinhAnh or '' }}"
                     data-trangthai="{{ svc.TrangThai }}"
                     title="Sửa dịch vụ">
@@ -145,21 +154,40 @@
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Đường dẫn ảnh đại diện</label>
-            <input type="text" name="hinh_anh" class="form-control" placeholder="VD: images/services/buffet.jpg" id="addImgUrl" oninput="previewImg(this.value,'addImgPreview')">
-            <div class="img-preview-box" id="addImgPreview" style="height:80px;margin-top:8px;">
-              <span class="placeholder-text"><i class="fa-regular fa-image"></i> Xem trước</span>
+            <label>Ảnh dịch vụ</label>
+            <div class="drop-zone" id="addDropZone" 
+                 onclick="document.getElementById('addFile').click()"
+                 ondragover="handleDragOver(event, this)" 
+                 ondragleave="handleDragLeave(event, this)" 
+                 ondrop="handleDrop(event, this, 'addImgUrl', 'addImgPreview')">
+              <span class="placeholder-text"><i class="fa-solid fa-cloud-arrow-up"></i> Kéo thả hoặc nhấn để chọn ảnh</span>
             </div>
+            <input type="file" id="addFile" style="display:none" accept="image/*" onchange="handleFileSelect(this, 'addImgUrl', 'addDropZone', 'addImgPreview')">
+            <input type="hidden" name="hinh_anh" id="addImgUrl">
+            <div class="img-preview-box" id="addImgPreview" style="height:100px;margin-top:10px;display:none;border:1px solid var(--border-color);border-radius:8px;overflow:hidden;"></div>
           </div>
           <div class="form-group">
-            <label>Cho phép thay đổi số lượng?</label>
-            <div style="display:flex;gap:15px;margin-top:10px;">
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="radio" name="thay_doi_sl" value="1" style="accent-color:var(--primary-red)"> Có
-              </label>
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="radio" name="thay_doi_sl" value="0" checked style="accent-color:var(--primary-red)"> Không
-              </label>
+            <label>Tùy chọn dịch vụ</label>
+            <div style="margin-top:10px;">
+              <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:5px;">Cho phép thay đổi số lượng?</label>
+              <div style="display:flex;gap:15px;margin-bottom:15px;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="radio" name="thay_doi_sl" value="1" style="accent-color:var(--primary-red)"> Có
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="radio" name="thay_doi_sl" value="0" checked style="accent-color:var(--primary-red)"> Không
+                </label>
+              </div>
+              
+              <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:5px;">Tính theo ngày lưu trú?</label>
+              <div style="display:flex;gap:15px;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="radio" name="tinh_theo_ngay" value="1" style="accent-color:var(--primary-red)"> Có
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="radio" name="tinh_theo_ngay" value="0" checked style="accent-color:var(--primary-red)"> Không
+                </label>
+              </div>
             </div>
           </div>
         </div>
@@ -197,27 +225,45 @@
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Đường dẫn ảnh đại diện</label>
-            <input type="text" name="hinh_anh" id="edit_hinh_anh" class="form-control" oninput="previewImg(this.value,'editImgPreview')">
-            <div class="img-preview-box" id="editImgPreview" style="height:80px;margin-top:8px;">
-              <span class="placeholder-text"><i class="fa-regular fa-image"></i> Xem trước</span>
+            <label>Ảnh dịch vụ</label>
+            <div class="drop-zone" id="editDropZone" 
+                 onclick="document.getElementById('editFile').click()"
+                 ondragover="handleDragOver(event, this)" 
+                 ondragleave="handleDragLeave(event, this)" 
+                 ondrop="handleDrop(event, this, 'edit_hinh_anh', 'editImgPreview')">
+              <span class="placeholder-text"><i class="fa-solid fa-cloud-arrow-up"></i> Kéo thả hoặc nhấn để chọn ảnh</span>
             </div>
+            <input type="file" id="editFile" style="display:none" accept="image/*" onchange="handleFileSelect(this, 'edit_hinh_anh', 'editDropZone', 'editImgPreview')">
+            <input type="hidden" name="hinh_anh" id="edit_hinh_anh">
+            <div class="img-preview-box" id="editImgPreview" style="height:100px;margin-top:10px;border:1px solid var(--border-color);border-radius:8px;overflow:hidden;"></div>
           </div>
           <div class="form-group">
-            <label>Cho phép thay đổi số lượng?</label>
-            <div style="display:flex;gap:15px;margin-top:10px;" id="editSLGroup">
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="radio" name="thay_doi_sl" value="1" style="accent-color:var(--primary-red)"> Có
-              </label>
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="radio" name="thay_doi_sl" value="0" style="accent-color:var(--primary-red)"> Không
-              </label>
-            </div>
-            <div style="margin-top:15px;">
-              <label>Trạng thái</label>
-              <select name="trang_thai" id="edit_trang_thai" class="form-control" style="margin-top:8px;">
-                <option value="Đang có">Đang có</option>
-                <option value="Đang khóa">Đang khóa</option>
+            <label>Tùy chọn & Trạng thái</label>
+            <div style="margin-top:10px;">
+              <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:5px;">Cho phép thay đổi số lượng?</label>
+              <div style="display:flex;gap:15px;margin-bottom:12px;" id="editSLGroup">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="radio" name="thay_doi_sl" value="1" style="accent-color:var(--primary-red)"> Có
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="radio" name="thay_doi_sl" value="0" style="accent-color:var(--primary-red)"> Không
+                </label>
+              </div>
+
+              <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:5px;">Tính theo ngày lưu trú?</label>
+              <div style="display:flex;gap:15px;margin-bottom:12px;" id="editTTNGroup">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="radio" name="tinh_theo_ngay" value="1" style="accent-color:var(--primary-red)"> Có
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                  <input type="radio" name="tinh_theo_ngay" value="0" style="accent-color:var(--primary-red)"> Không
+                </label>
+              </div>
+
+              <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:8px;">Trạng thái dịch vụ</label>
+              <select name="trang_thai" id="edit_trang_thai" class="form-control">
+                <option value="Đang có">✅ Đang có</option>
+                <option value="Đang khóa">🔒 Đang khóa</option>
               </select>
             </div>
           </div>
@@ -244,9 +290,18 @@ function openEditModal(btn) {
   document.getElementById('edit_gia_tien').value = d.giatien;
   document.getElementById('edit_hinh_anh').value = d.hinhanh || '';
   document.getElementById('edit_trang_thai').value = d.trangthai;
-  previewImg(d.hinhanh, 'editImgPreview');
-  // set radio
+  
+  if (d.hinhanh) {
+    previewImg(d.hinhanh, 'editImgPreview');
+    document.getElementById('editImgPreview').style.display = 'block';
+  } else {
+    document.getElementById('editImgPreview').style.display = 'none';
+  }
+
+  // set radios
   document.querySelectorAll('#editSLGroup input[name="thay_doi_sl"]').forEach(r => r.checked = (r.value == d.thaydoisl));
+  document.querySelectorAll('#editTTNGroup input[name="tinh_theo_ngay"]').forEach(r => r.checked = (r.value == d.tinhtheongay));
+  
   document.getElementById('editModal').classList.add('show');
 }
 
@@ -319,5 +374,82 @@ searchInput.addEventListener('input', () => {
 document.getElementById('filterStatus').addEventListener('change', () => {
   document.getElementById('searchForm').submit();
 });
+
+// --- DRAG & DROP LOGIC ---
+function handleDragOver(e, el) {
+  e.preventDefault();
+  el.classList.add('drag-over');
+}
+function handleDragLeave(e, el) {
+  el.classList.remove('drag-over');
+}
+function handleDrop(e, el, inputId, previewId) {
+  e.preventDefault();
+  el.classList.remove('drag-over');
+  const files = e.dataTransfer.files;
+  if (files.length > 0) {
+    uploadFile(files[0], el, inputId, previewId);
+  }
+}
+function handleFileSelect(input, inputId, dropZoneId, previewId) {
+  if (input.files.length > 0) {
+    uploadFile(input.files[0], document.getElementById(dropZoneId), inputId, previewId);
+  }
+}
+
+async function uploadFile(file, dropZone, inputId, previewId) {
+  if (!file.type.match('image.*')) {
+    showToast('Chỉ hỗ trợ file hình ảnh!', 'danger');
+    return;
+  }
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('folder', 'services');
+
+  const originalContent = dropZone.innerHTML;
+  dropZone.innerHTML = '<div class="spinner-overlay"><span class="spinner"></span></div>';
+  dropZone.style.pointerEvents = 'none';
+
+  try {
+    const res = await fetch('/api/upload_image', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (data.status === 'success') {
+      document.getElementById(inputId).value = data.url;
+      const previewBox = document.getElementById(previewId);
+      previewBox.style.display = 'block';
+      previewImg(data.url, previewId);
+      showToast('Tải ảnh lên thành công!', 'success');
+    } else {
+      showToast(data.message || 'Lỗi khi tải ảnh', 'danger');
+    }
+  } catch (err) {
+    showToast('Không thể kết nối đến server!', 'danger');
+  } finally {
+    dropZone.innerHTML = originalContent;
+    dropZone.style.pointerEvents = '';
+  }
+}
 </script>
+
+<style>
+.drop-zone {
+  border: 2px dashed var(--border-color);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: var(--bg-light);
+}
+.drop-zone:hover, .drop-zone.drag-over {
+  border-color: var(--primary-red);
+  background: rgba(246, 78, 96, 0.05);
+  color: var(--primary-red);
+}
+.drop-zone i { font-size: 24px; display: block; margin-bottom: 8px; }
+.spinner-overlay { display: flex; align-items: center; justify-content: center; height: 100%; }
+.spinner { width: 24px; height: 24px; border: 3px solid rgba(246, 78, 96, 0.2); border-top-color: var(--primary-red); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
 {% endblock %}
