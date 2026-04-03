@@ -290,7 +290,7 @@ def reorder_room_type_images_api():
 # 🔹 4. QUẢN LÝ DỊCH VỤ (SERVICES)
 # ─────────────────────────────────────────────
 @app.route('/api/services_admin', methods=['GET'])
-def get_services_api():
+def get_services_api_admin():
     search = request.args.get('search', '')
     filter_status = request.args.get('trang_thai', '')
     conn = get_db()

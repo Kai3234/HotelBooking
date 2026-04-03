@@ -57,18 +57,30 @@
     <div class="card-header" style="margin-bottom: 15px; border-bottom: none; padding-bottom: 0;">
         <h3 class="card-title"><i class="fa-solid fa-calendar-check" style="color: var(--primary-red); margin-right: 8px;"></i> Tra cứu trạng thái phòng</h3>
     </div>
-    
-    <!-- Team Backend: Nhận request GET từ form này để filter -->
-    <form action="#" method="GET" class="toolbar" style="margin-bottom: 0; background: var(--bg-light); padding: 15px; border-radius: 8px;">
+
+    <!-- Bộ lọc ngày -->
+    <form action="" method="GET" class="toolbar mb-4" style="margin-bottom: 0; background: var(--bg-light); padding: 15px; border-radius: 8px;">
         <div class="filter-group" style="flex: 1; display: flex; gap: 20px;">
             <div style="display: flex; align-items: center; gap: 10px;">
                 <label style="font-weight: 600; font-size: 14px;">Từ ngày:</label>
                 <!-- Dùng type="date", nếu khách sạn tính theo giờ có thể đổi thành type="datetime-local" -->
-                <input type="date" name="checkin_date" class="form-control" style="width: 160px;" value="2026-04-02" required>
+                <input type="date" name="checkin_date" value="{{ checkin_date }}" class="form-control" style="width: 160px;" value="2026-04-02" required>
             </div>
             <div style="display: flex; align-items: center; gap: 10px;">
                 <label style="font-weight: 600; font-size: 14px;">Đến ngày:</label>
-                <input type="date" name="checkout_date" class="form-control" style="width: 160px;" value="2026-04-05" required>
+                <input type="date" name="checkout_date" value="{{ checkout_date }}" class="form-control" style="width: 160px;" value="2026-04-05" required>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 10px;">
+            <label style="font-weight: 600; font-size: 14px;">Loại phòng:</label>
+                <select name="ma_loai" class="form-control" style="width: 180px;">
+                    <option value="all">--- Tất cả loại ---</option>
+                    {% for lp in danh_sach_loai %}
+                        <option value="{{ lp.MaLoai }}" {% if ma_loai_filter|string == lp.MaLoai|string %}selected{% endif %}>
+                            {{ lp.TenLoai }}
+                        </option>
+                    {% endfor %}
+                </select>
             </div>
             <button type="submit" class="btn btn-primary"><i class="fa-solid fa-search"></i> Kiểm tra</button>
         </div>
@@ -85,91 +97,30 @@
 <!-- ================= 2. SƠ ĐỒ CÁC TẦNG ================= -->
 <!-- TEAM BACKEND LƯU Ý: Dùng vòng lặp for tang, danh_sach_phong in dict_tang.items()  -->
 
-<!-- TẦNG 1 -->
-<div class="card">
-    <div class="floor-title"><span>T1</span> Tầng 1 (Khu Vực Sảnh)</div>
+<!-- Sơ đồ phòng -->
+{% for ten_tang, danh_sach_phong in dict_tang.items() %}
+<div class="card mb-4">
+    <div class="floor-title">
+        <span>{{ ten_tang.replace('Tầng ', 'T') }}</span> {{ ten_tang }}
+    </div>
     <div class="room-map-grid">
-        
-        <!-- Phòng Trống -->
-        <div class="room-box status-available" title="Trống - Standard Giường Đôi">
-            <div class="room-icon"><i class="fa-solid fa-door-open"></i></div>
-            <div class="room-number">101</div>
-            <div class="room-type">Standard</div>
-        </div>
+        {% for room in danh_sach_phong %}
+            <div class="room-box {{ room.status_class }}" title="{{ room.tooltip }}">
 
-        <!-- Phòng Trống -->
-        <div class="room-box status-available" title="Trống - Standard Giường Đôi">
-            <div class="room-icon"><i class="fa-solid fa-door-open"></i></div>
-            <div class="room-number">102</div>
-            <div class="room-type">Standard</div>
-        </div>
-        
-        <!-- Phòng Có khách -->
-        <div class="room-box status-occupied" title="Lê Văn Khách - Trả phòng: 05/04">
-            <div class="room-icon"><i class="fa-solid fa-bed"></i></div>
-            <div class="room-number">103</div>
-            <div class="room-type">Standard</div>
-        </div>
+                {% if room.is_checkout_today %}
+                    <div class="room-badge">Trả hôm nay</div>
+                {% endif %}
 
+                <div class="room-icon">
+                    <i class="fa-solid {{ room.icon }}"></i>
+                </div>
+                <div class="room-number">{{ room.so_phong }}</div>
+                <div class="room-type">{{ room.ten_loai }}</div>
+            </div>
+        {% endfor %}
     </div>
 </div>
-
-<!-- TẦNG 2 -->
-<div class="card">
-    <div class="floor-title"><span>T2</span> Tầng 2 (View Biển)</div>
-    <div class="room-map-grid">
-        
-        <!-- Phòng Có khách (Hiển thị thêm badge Trả trong ngày) -->
-        <div class="room-box status-occupied" title="Lý Mạc Sầu - Trả phòng HÔM NAY">
-            <div class="room-badge">Trả hôm nay</div>
-            <div class="room-icon"><i class="fa-solid fa-suitcase-rolling"></i></div>
-            <div class="room-number">201</div>
-            <div class="room-type">Deluxe View</div>
-        </div>
-
-        <!-- Phòng Bảo trì -->
-        <div class="room-box status-maintenance" title="Đang hỏng điều hòa">
-            <div class="room-icon"><i class="fa-solid fa-screwdriver-wrench"></i></div>
-            <div class="room-number">202</div>
-            <div class="room-type">Deluxe View</div>
-        </div>
-
-        <!-- Phòng Trống -->
-        <div class="room-box status-available">
-            <div class="room-icon"><i class="fa-solid fa-door-open"></i></div>
-            <div class="room-number">203</div>
-            <div class="room-type">Deluxe View</div>
-        </div>
-        
-        <!-- Phòng Trống -->
-        <div class="room-box status-available">
-            <div class="room-icon"><i class="fa-solid fa-door-open"></i></div>
-            <div class="room-number">204</div>
-            <div class="room-type">Deluxe View</div>
-        </div>
-
-    </div>
-</div>
-
-<!-- TẦNG 3 -->
-<div class="card">
-    <div class="floor-title"><span>T3</span> Tầng 3 (Khu VIP)</div>
-    <div class="room-map-grid">
-        
-        <div class="room-box status-occupied" title="Lê Đức C - Suite VIP">
-            <div class="room-icon"><i class="fa-solid fa-crown"></i></div>
-            <div class="room-number">301</div>
-            <div class="room-type">Suite VIP</div>
-        </div>
-        
-        <div class="room-box status-available">
-            <div class="room-icon"><i class="fa-solid fa-crown"></i></div>
-            <div class="room-number">302</div>
-            <div class="room-type">Suite VIP</div>
-        </div>
-
-    </div>
-</div>
+{% endfor %}
 
 <!-- Mẹo cho UI: Script nhỏ để click vào phòng trống thì hiện thông báo hoặc chuyển sang gán phòng -->
 <script>

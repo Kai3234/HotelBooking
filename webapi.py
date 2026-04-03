@@ -8,7 +8,6 @@ sqldbname = 'db/website.db'
 
 # Hàm kết nối tới Cơ sở dữ liệu SQLite
 def get_db():
-    # Đảm bảo file hotel.db nằm cùng cấp thư mục với file api_app.py này
     conn = sqlite3.connect(sqldbname)
     conn.row_factory = sqlite3.Row # Giúp lấy dữ liệu dạng Dictionary thay vì Tuple
     return conn
@@ -211,6 +210,8 @@ def cancel_booking_customer_api(ma_dp):
 
 
 from admin_api import *
+from customer_api import *
+from receptionist_api import *
 
 
 if __name__ == '__main__':
