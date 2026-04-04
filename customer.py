@@ -166,7 +166,10 @@ def cart_view():
         item['so_ngay'] = days
         tong_tien_phong += int(item.get('GiaTien', 0)) * days
         for sv in item.get('services', []):
-            tong_tien_dichvu += int(sv.get('GiaTien', 0)) * int(sv.get('SoLuong', 1))
+            cost = int(sv.get('GiaTien', 0)) * int(sv.get('SoLuong', 1))
+            if sv.get('TinhTheoNgay') == 1:
+                cost *= days
+            tong_tien_dichvu += cost
     return render_template('customer/cart.html', cart_items=cart_items, tong_tien_phong=tong_tien_phong,
                            tong_tien_dichvu=tong_tien_dichvu)
 
@@ -183,6 +186,21 @@ def add_to_cart():
 
     if not checkin or not checkout or checkin == "Chua chon" or checkout == "Chua chon":
         flash("Lỗi hệ thống: Bắt buộc chọn Ngày Nhận Phòng và Ngày Trả Phòng!", "danger")
+        return redirect(request.referrer or url_for('rooms_list'))
+
+    try:
+        try:
+            ci_date = datetime.strptime(checkin, '%d/%m/%Y')
+            co_date = datetime.strptime(checkout, '%d/%m/%Y')
+        except ValueError:
+            ci_date = datetime.strptime(checkin, '%Y-%m-%d')
+            co_date = datetime.strptime(checkout, '%Y-%m-%d')
+        
+        if (co_date - ci_date).days < 1:
+            flash("Lỗi: Ngày trả phòng phải sau ngày nhận phòng ít nhất 1 ngày!", "danger")
+            return redirect(request.referrer or url_for('rooms_list'))
+    except Exception:
+        flash("Lỗi định dạng ngày không hợp lệ!", "danger")
         return redirect(request.referrer or url_for('rooms_list'))
 
     if 'cart' not in session: session['cart'] = []
@@ -221,7 +239,10 @@ def checkout():
         item['so_ngay'] = days
         tong_cong += int(item.get('GiaTien', 0)) * days
         for sv in item.get('services', []):
-            tong_cong += int(sv.get('GiaTien', 0)) * int(sv.get('SoLuong', 1))
+            cost = int(sv.get('GiaTien', 0)) * int(sv.get('SoLuong', 1))
+            if sv.get('TinhTheoNgay') == 1:
+                cost *= days
+            tong_cong += cost
 
     return render_template('customer/checkout.html', cart_items=cart_items, tong_cong=tong_cong)
 
@@ -240,7 +261,10 @@ def confirm_booking():
         item['so_ngay'] = days
         tong_cong += int(item.get('GiaTien', 0)) * days
         for sv in item.get('services', []):
-            tong_cong += int(sv.get('GiaTien', 0)) * int(sv.get('SoLuong', 1))
+            cost = int(sv.get('GiaTien', 0)) * int(sv.get('SoLuong', 1))
+            if sv.get('TinhTheoNgay') == 1:
+                cost *= days
+            tong_cong += cost
 
     # DEBUG: Kiểm tra xem MaTK có thực sự tồn tại không
     print(f"DEBUG: User session: {session['current_user']}")
@@ -366,3 +390,18 @@ def remove_from_cart(index):
         flash(f"Đã gỡ bỏ phòng {removed_item.get('TenLoai')} khỏi giỏ hàng!", "info")
 
     return redirect(url_for('cart_view'))
+
+@app.route('/remove_service_from_cart/<int:room_index>/<int:service_index>')
+def remove_service_from_cart(room_index, service_index):
+    if 'current_user' not in session:
+        return redirect(url_for('login'))
+
+    cart = session.get('cart', [])
+    if 0 <= room_index < len(cart):
+        services = cart[room_index].get('services', [])
+        if 0 <= service_index < len(services):
+            removed_sv = services.pop(service_index)
+            session.modified = True
+            flash(f"Đã gỡ dịch vụ {removed_sv.get('TenDV')} khỏi phòng!", "info")
+
+    return redirect(url_for('cart_view'))
