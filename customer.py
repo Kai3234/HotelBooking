@@ -1,6 +1,20 @@
 import requests
 from flask import session, redirect, render_template, request, url_for, flash
 from main import app, BASE_URL
+from datetime import datetime
+
+def calculate_days(checkin_str, checkout_str):
+    try:
+        try:
+            ci = datetime.strptime(checkin_str, '%d/%m/%Y')
+            co = datetime.strptime(checkout_str, '%d/%m/%Y')
+        except ValueError:
+            ci = datetime.strptime(checkin_str, '%Y-%m-%d')
+            co = datetime.strptime(checkout_str, '%Y-%m-%d')
+        days = (co - ci).days
+        return days if days > 0 else 1
+    except Exception:
+        return 1
 
 
 # --- HÀM HỖ TRỢ: Fix đường dẫn ảnh để luôn có /static/ ---
@@ -145,9 +159,12 @@ def cart_view():
         return redirect(url_for('login'))
 
     cart_items = session.get('cart', [])
-    tong_tien_phong = sum(int(item.get('GiaTien', 0)) for item in cart_items)
+    tong_tien_phong = 0
     tong_tien_dichvu = 0
     for item in cart_items:
+        days = calculate_days(item.get('checkin', ''), item.get('checkout', ''))
+        item['so_ngay'] = days
+        tong_tien_phong += int(item.get('GiaTien', 0)) * days
         for sv in item.get('services', []):
             tong_tien_dichvu += int(sv.get('GiaTien', 0)) * int(sv.get('SoLuong', 1))
     return render_template('customer/cart.html', cart_items=cart_items, tong_tien_phong=tong_tien_phong,
@@ -200,8 +217,9 @@ def checkout():
 
     tong_cong = 0
     for item in cart_items:
-        # Ép kiểu int để tính toán không bị lỗi chuỗi
-        tong_cong += int(item.get('GiaTien', 0))
+        days = calculate_days(item.get('checkin', ''), item.get('checkout', ''))
+        item['so_ngay'] = days
+        tong_cong += int(item.get('GiaTien', 0)) * days
         for sv in item.get('services', []):
             tong_cong += int(sv.get('GiaTien', 0)) * int(sv.get('SoLuong', 1))
 
@@ -215,10 +233,12 @@ def confirm_booking():
     if 'current_user' not in session:
         return redirect(url_for('login'))
 
-    # TÍNH TỔNG TIỀN (BAO GỒM CẢ DỊCH VỤ)
+    # TÍNH TỔNG TIỀN (BAO GỒM TIỀN PHÒNG * SỐ NGÀY + DỊCH VỤ)
     tong_cong = 0
     for item in session['cart']:
-        tong_cong += int(item.get('GiaTien', 0))
+        days = calculate_days(item.get('checkin', ''), item.get('checkout', ''))
+        item['so_ngay'] = days
+        tong_cong += int(item.get('GiaTien', 0)) * days
         for sv in item.get('services', []):
             tong_cong += int(sv.get('GiaTien', 0)) * int(sv.get('SoLuong', 1))
 

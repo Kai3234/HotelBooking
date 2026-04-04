@@ -154,6 +154,14 @@ def cancel_booking_customer_api(ma_dp):
     conn = get_db()
     try:
         conn.execute("UPDATE DATPHONG SET TrangThai = 'Đã hủy' WHERE MaDP = ?", (ma_dp,))
+        conn.execute("UPDATE CHITIET_DATPHONG SET TrangThai = 'Đã hủy' WHERE MaDP = ?", (ma_dp,))
+        conn.execute("""
+            UPDATE DATPHONG_DICHVU 
+            SET TrangThai = 'Đã hủy' 
+            WHERE MaCTDP IN (
+                SELECT MaCTDP FROM CHITIET_DATPHONG WHERE MaDP = ?
+            )
+        """, (ma_dp,))
         conn.commit()
         return jsonify({"status": "success"})
     except Exception as e:
