@@ -30,11 +30,13 @@
             <input type="text" name="search" value="{{ search_query }}" placeholder="Nhập Tên, Số điện thoại hoặc Email...">
         </div>
         <div class="filter-group">
-            <label>Trạng thái hiện tại:</label>
-            <select class="form-control" name="status_filter">
-                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Tất cả khách hàng</option>
-                <option value="dang_o" {% if status_filter == 'dang_o' %}selected{% endif %}>Đang lưu trú</option>
-                <option value="sap_den" {% if status_filter == 'sap_den' %}selected{% endif %}>Đang có đơn chờ đến</option>
+            <label style="font-weight: 600; font-size: 13px;">Lọc tình trạng:</label>
+            <select class="form-control" name="status_filter" style="width: 200px;" onchange="this.form.submit()">
+                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>--- Tất cả khách ---</option>
+                <option value="dang_o" {% if status_filter == 'dang_o' %}selected{% endif %}>🏠 Đang lưu trú</option>
+                <option value="sap_den" {% if status_filter == 'sap_den' %}selected{% endif %}>📅 Sắp đến (Đặt trước)</option>
+                <option value="cho_xac_nhan" {% if status_filter == 'cho_xac_nhan' %}selected{% endif %}>⏳ Chờ xác nhận đơn</option>
+                <option value="chua_gan_phong" {% if status_filter == 'chua_gan_phong' %}selected{% endif %}>🔑 Chưa gán số phòng</option>
             </select>
             <button type="submit" class="btn btn-primary"><i class="fa-solid fa-filter"></i> Lọc</button>
         </div>
@@ -62,31 +64,65 @@
                         <span style="font-weight: 700; color: var(--text-dark);">{{ kh.HoTen }}</span><br>
                         <small>{{ kh.SDT }}</small>
                     </td>
-                    <td>
-                        <!-- Trạng thái: Chờ xác nhận -->
-                        {% if kh.CoDonChoXacNhan > 0 %}
-                            <span class="badge" style="background: #E1F0FF; color: #009EF7; margin-bottom: 5px;">
-                                <i class="fa-solid fa-hourglass-start"></i> {{ kh.CoDonChoXacNhan }} đơn chờ xác nhận
-                            </span><br>
-                        {% endif %}
+                    <td style="vertical-align: top; padding: 15px;">
+                        <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-start;">
 
-                        <!-- Trạng thái: Check-in hôm nay -->
-                        {% if kh.CoCheckinHomNay > 0 %}
-                            <span class="badge" style="background: #FFF4DE; color: #FFA800; margin-bottom: 5px;">
-                                <i class="fa-solid fa-bell"></i> {{ kh.CoCheckinHomNay }} phòng chờ Check-in
-                            </span><br>
-                        {% endif %}
+                            <!-- 1. CHỜ XÁC NHẬN -->
+                            {% if kh.CoDonChoXacNhan > 0 %}
+                                <span class="badge" style="background: #E1F0FF; color: #009EF7; border: 1px solid #009EF7;">
+                                    <i class="fa-solid fa-hourglass-start"></i> {{ kh.CoDonChoXacNhan }} đơn chờ duyệt
+                                </span>
+                            {% endif %}
 
-                        <!-- Trạng thái: Đang ở -->
-                        {% if kh.CacPhongDangO %}
-                            <span class="badge badge-success">Đang lưu trú</span><br>
-                            <small style="color: var(--primary-red); font-weight: 600;">P. {{ kh.CacPhongDangO }}</small>
-                        {% endif %}
+                            <!-- 2. CHƯA GÁN PHÒNG -->
+                            {% if kh.ChuaGanPhong > 0 %}
+                                <span class="badge" style="background: #FFF4DE; color: #FFA800; border: 1px solid #FFA800;">
+                                    <i class="fa-solid fa-key"></i> {{ kh.ChuaGanPhong }} đơn chưa chọn phòng
+                                </span>
+                            {% endif %}
 
-                        <!-- Nếu không có đơn nào bận -->
-                        {% if kh.CoDonChoXacNhan == 0 and kh.CoCheckinHomNay == 0 and not kh.CacPhongDangO %}
-                            <span class="badge" style="color: #A1A5B7; border: 1px solid #E4E6EF;">Khách bình thường</span>
-                        {% endif %}
+                            <!-- 3. CHECK-IN HÔM NAY -->
+                            {% if kh.CoCheckinHomNay > 0 %}
+                                <span class="badge" style="background: #E8FFF3; color: #50CD89; border: 1px solid #50CD89;">
+                                    <i class="fa-solid fa-bell"></i> {{ kh.CoCheckinHomNay }} phòng chờ Check-in
+                                </span>
+                            {% endif %}
+
+                            <!-- 4. ĐÃ ĐẶT TRƯỚC (CHO TƯƠNG LAI) - PHẦN MỚI THÊM -->
+                            {% if kh.CoDonTuongLai > 0 %}
+                                <span class="badge" style="background: #F3EFFF; color: #8950FC; border: 1px solid #8950FC;">
+                                    <i class="fa-solid fa-calendar-days"></i> Sắp đến ({{ kh.CoDonTuongLai }} phòng)
+                                </span>
+                            {% endif %}
+
+                            <!-- 5. CẦN CHECK-OUT HÔM NAY -->
+                            {% if kh.CoCheckoutHomNay > 0 %}
+                                <span class="badge" style="background: #FFE2E5; color: #F1416C; border: 1px solid #F1416C;">
+                                    <i class="fa-solid fa-person-walking-arrow-right"></i> Cần Check-out ({{ kh.CoCheckoutHomNay }})
+                                </span>
+                            {% endif %}
+
+                            <!-- 6. ĐANG Ở -->
+                            {% if kh.CacPhongDangO %}
+                                <div style="background: #f8f9fa; border-radius: 6px; padding: 6px 10px; border: 1px solid #eee; width: 100%;">
+                                    <span class="badge badge-success" style="margin-bottom: 4px; display: inline-block;">
+                                        <i class="fa-solid fa-house-user"></i> Đang lưu trú
+                                    </span><br>
+                                    <small style="color: var(--primary-red); font-weight: 700; font-size: 13px;">
+                                        <i class="fa-solid fa-door-open"></i> P. {{ kh.CacPhongDangO }}
+                                    </small>
+                                </div>
+                            {% endif %}
+
+                            <!-- 7. KHÔNG CÓ HOẠT ĐỘNG (Sửa lại điều kiện kiểm tra cả tương lai) -->
+                            {% if kh.CoDonChoXacNhan == 0 and kh.ChuaGanPhong == 0 and kh.CoCheckinHomNay == 0
+                                  and kh.CoCheckoutHomNay == 0 and not kh.CacPhongDangO and kh.CoDonTuongLai == 0 %}
+                                <span class="badge" style="color: #B5B5C3; border: 1px dashed #E4E6EF; background: transparent;">
+                                    Khách hàng cũ / Chưa có lịch
+                                </span>
+                            {% endif %}
+
+                        </div>
                     </td>
                     <td><span style="font-weight: 600;">{{ kh.SoDonThanhCong }}</span> đơn thành công</td>
                     <td>
@@ -183,57 +219,62 @@ function openCustomerModal(maKh, tenKh) {
             }
 
             bookings.forEach(dp => {
-                // 1. Dòng tiêu đề Đơn đặt phòng (Header row)
+                // 1. Dòng tiêu đề Đơn đặt phòng
                 body.innerHTML += `
-                    <tr style="background-color: #fcfcfc; border-top: 2px solid #eee;">
-                        <td style="vertical-align: middle;">
-                            <strong style="color: var(--primary-red); font-size: 15px;">#${dp.MaDP}</strong>
-                        </td>
-                        <td style="vertical-align: middle; font-size: 13px; color: #888;">${dp.NgayTao}</td>
-                        <td colspan="1" style="vertical-align: middle; font-weight: 600;">
-                            Đơn đặt phòng (${dp.ChiTiet.length} phòng)
-                        </td>
-                        <td style="text-align: right; vertical-align: middle; font-weight: 800; color: #222; font-size: 15px;">
-                            ${dp.TongTien.toLocaleString()}₫
-                        </td>
-                        <td style="text-align: center; vertical-align: middle;">
-                            ${getStatusBadge(dp.TrangThaiDon)}
-                        </td>
+                    <tr style="background-color: #f8f9fa; border-top: 2px solid #dee2e6;">
+                        <td style="vertical-align: middle;"><strong style="color: var(--primary-red);">#${dp.MaDP}</strong></td>
+                        <td style="vertical-align: middle; font-size: 12px;">${dp.NgayTao}</td>
+                        <td style="vertical-align: middle; font-weight: 600;">Đơn đặt phòng (${dp.ChiTiet.length} phòng)</td>
+                        <td style="text-align: right; vertical-align: middle; font-weight: 800;">${dp.TongTien.toLocaleString()}₫</td>
+                        <td style="text-align: center; vertical-align: middle;">${getStatusBadge(dp.TrangThaiDon)}</td>
                     </tr>
                 `;
 
-                // 2. Các dòng chi tiết phòng của đơn đó (Detail rows)
+                // 2. Lặp qua các Phòng
                 dp.ChiTiet.forEach(ct => {
-                    let infoPhong = ct.SoPhong ? `<b style="color:#009ef7">Phòng ${ct.SoPhong}</b>` : `<i style="color:#aaa">Chưa gán</i>`;
-
+                    let infoPhong = ct.SoPhong ? `<b style="color:#009ef7">Phòng ${ct.SoPhong}</b>` : `<i style="color:#aaa">Chờ gán</i>`;
                     body.innerHTML += `
-                        <tr style="border-bottom: 1px solid #f8f8f8;">
+                        <tr style="border-bottom: 1px solid #eee;">
                             <td></td>
                             <td></td>
                             <td style="padding-left: 20px;">
-                                <div style="display: flex; align-items: center; gap: 10px;">
-                                    <i class="fa-solid fa-caret-right" style="color: #ddd;"></i>
-                                    <div>
-                                        ${infoPhong} - <span style="font-size: 13px; color: #555;">${ct.TenLoai}</span><br>
-                                        <small style="color: #999;">${ct.NgayNhan} ➔ ${ct.NgayTra}</small>
-                                    </div>
-                                </div>
+                                <i class="fa-solid fa-bed" style="color: #888; margin-right: 5px;"></i>
+                                ${infoPhong} - <span style="font-size: 13px;">${ct.TenLoai}</span>
+                                <div style="font-size: 11px; color: #999; margin-left: 22px;">${ct.NgayNhan} ➔ ${ct.NgayTra}</div>
                             </td>
-                            <td style="text-align: right; color: #666; font-size: 13px;">
-                                ${ct.GiaPhong.toLocaleString()}₫
-                            </td>
-                            <td style="text-align: center;">
-                                <span style="font-size: 11px; color: #999; border: 1px solid #eee; padding: 2px 8px; border-radius: 4px;">
-                                    ${ct.TrangThaiPhong}
-                                </span>
-                            </td>
+                            <td style="text-align: right; font-size: 13px;">${ct.GiaPhong.toLocaleString()}₫</td>
+                            <td style="text-align: center;"><small class="text-muted">${ct.TrangThaiPhong}</small></td>
                         </tr>
                     `;
+
+                    // 3. Lặp qua các Dịch vụ của phòng này
+                    if (ct.DichVu && ct.DichVu.length > 0) {
+                        ct.DichVu.forEach(dv => {
+                            body.innerHTML += `
+                                <tr style="background-color: #fff; border-bottom: 1px dashed #f1f1f1;">
+                                    <td></td>
+                                    <td></td>
+                                    <td style="padding-left: 45px; font-size: 13px; color: #555;">
+                                        <i class="fa-solid fa-concierge-bell" style="color: #FFA800; margin-right: 5px; font-size: 11px;"></i>
+                                        ${dv.TenDV} <span style="color: #999;">(x${dv.SoLuong})</span>
+                                        <div style="font-size: 10px; color: #bbb; margin-left: 18px;">Ngày dùng: ${dv.NgayDV}</div>
+                                    </td>
+                                    <td style="text-align: right; font-size: 12px; color: #777;">
+                                        ${(dv.GiaDV * dv.SoLuong).toLocaleString()}₫
+                                    </td>
+                                    <td style="text-align: center;">
+                                        <span style="font-size: 10px; color: #999;">${dv.TrangThaiDV}</span>
+                                    </td>
+                                </tr>
+                            `;
+                        });
+                    }
                 });
             });
         })
         .catch(err => {
-            body.innerHTML = '<tr><td colspan="5" style="text-align:center; color:red; padding:30px;">Lỗi kết nối API.</td></tr>';
+            console.error(err);
+            body.innerHTML = '<tr><td colspan="5" style="text-align:center; color:red; padding:30px;">Lỗi kết nối dữ liệu.</td></tr>';
         });
 
     document.getElementById('customerModal').classList.add('show');

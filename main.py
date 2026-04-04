@@ -146,7 +146,7 @@ def backend_dashboard():
         if session['current_user']['ChucVu'] == 'nhanvien':
             if session['current_user']['LaAdmin'] == 1:
                 return redirect(url_for('dashboard_admin'))
-            return redirect(url_for('dashboard_admin'))
+            return redirect(url_for('dashboard_rec'))
         return redirect(url_for('dashboard_rec'))
     return redirect(url_for('index'))
 

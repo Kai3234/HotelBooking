@@ -1,8 +1,93 @@
+import calendar
 from datetime import date, datetime
 
 from flask import jsonify, request
 
 from webapi import app, get_db
+
+# dashboard_rec
+# API lấy khoảng năm dành riêng cho Lễ tân
+@app.route('/api/rec/years-range-rec', methods=['GET'])
+def get_years_range_rec():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT MIN(strftime('%Y', NgayNhan)), MAX(strftime('%Y', NgayTra)) FROM CHITIET_DATPHONG")
+    row = cursor.fetchone()
+    conn.close()
+
+    current_year = datetime.now().year
+    start = int(row[0]) if row[0] else current_year
+    end = int(row[1]) if row[1] else current_year
+    return jsonify({"min_year": min(start, current_year), "max_year": max(end, current_year)})
+
+
+# API 2: Lấy thống kê cho Lễ tân
+@app.route('/api/rec/stats', methods=['GET'])
+def get_rec_stats():
+    month = int(request.args.get('month'))
+    year = int(request.args.get('year'))
+    today = datetime.now().strftime('%Y-%m-%d')
+    month_filter = f"{year}-{month:02d}"
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # --- CHUNG (HIỆN TẠI) ---
+    cursor.execute("SELECT COUNT(DISTINCT MaPhong) FROM CHITIET_DATPHONG WHERE TrangThai = 'Đã nhận'")
+    occupied = cursor.fetchone()[0] or 0
+
+    cursor.execute("SELECT COUNT(*) FROM PHONG WHERE TrangThai = 'Sẵn sàng'")
+    available = cursor.fetchone()[0] or 0
+
+    cursor.execute("SELECT COUNT(*) FROM CHITIET_DATPHONG WHERE NgayNhan = ? AND TrangThai != 'Đã hủy'", (today,))
+    ci_today = cursor.fetchone()[0] or 0
+
+    cursor.execute("SELECT COUNT(*) FROM CHITIET_DATPHONG WHERE NgayTra = ? AND TrangThai != 'Đã hủy'", (today,))
+    co_today = cursor.fetchone()[0] or 0
+
+    # --- THEO THÁNG ---
+    cursor.execute(
+        "SELECT COUNT(DISTINCT MaDP) FROM CHITIET_DATPHONG WHERE (strftime('%Y-%m', NgayNhan) = ? OR strftime('%Y-%m', NgayTra) = ?) AND TrangThai != 'Đã hủy'",
+        (month_filter, month_filter))
+    m_staying = cursor.fetchone()[0] or 0
+
+    cursor.execute(
+        "SELECT COUNT(*) FROM CHITIET_DATPHONG WHERE strftime('%Y-%m', NgayNhan) = ? AND TrangThai != 'Đã hủy'",
+        (month_filter,))
+    m_ci = cursor.fetchone()[0] or 0
+
+    cursor.execute(
+        "SELECT COUNT(*) FROM CHITIET_DATPHONG WHERE strftime('%Y-%m', NgayTra) = ? AND TrangThai != 'Đã hủy'",
+        (month_filter,))
+    m_co = cursor.fetchone()[0] or 0
+
+    # --- BIỂU ĐỒ ---
+    num_days = calendar.monthrange(year, month)[1]
+    labels, chart_ci, chart_co, chart_stay = [], [], [], []
+
+    for d in range(1, num_days + 1):
+        d_str = f"{year}-{month:02d}-{d:02d}"
+        labels.append(f"{d:02d}")
+
+        cursor.execute("SELECT COUNT(*) FROM CHITIET_DATPHONG WHERE NgayNhan = ? AND TrangThai != 'Đã hủy'", (d_str,))
+        chart_ci.append(cursor.fetchone()[0] or 0)
+
+        cursor.execute("SELECT COUNT(*) FROM CHITIET_DATPHONG WHERE NgayTra = ? AND TrangThai != 'Đã hủy'", (d_str,))
+        chart_co.append(cursor.fetchone()[0] or 0)
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM CHITIET_DATPHONG WHERE NgayNhan <= ? AND NgayTra > ? AND TrangThai != 'Đã hủy'",
+            (d_str, d_str))
+        chart_stay.append(cursor.fetchone()[0] or 0)
+
+    conn.close()
+    return jsonify({
+        "general": {"occupied": occupied, "available": available, "ci_today": ci_today, "co_today": co_today},
+        "monthly": {"staying": m_staying, "ci": m_ci, "co": m_co},
+        "chart": {"labels": labels, "ci": chart_ci, "co": chart_co, "stay": chart_stay}
+    })
+
+# KT dashboard_rec
 
 # API của rooms_layout_rec
 @app.route('/api/rec/room-status/<ma_phong>', methods=['GET'])
@@ -201,54 +286,241 @@ def api_unassign_room():
     conn.close()
     return jsonify({"status": "success", "message": "Đã hủy gán phòng thành công"})
 
-# 4. API Check-in
-@app.route('/api/rec/checkin/<int:ma_ctdp>', methods=['POST'])
-def api_checkin(ma_ctdp):
+
+# Kt rooms_assign_rec
+
+
+# checkin_rec
+# 1. API Cập nhật trạng thái đơn đặt (Xác nhận hoặc Hủy)
+@app.route('/api/rec/update-booking-status', methods=['POST'])
+def api_update_booking_status():
+    data = request.json
+    ma_dp = data.get('ma_dp')
+    new_status = data.get('status')  # 'Đã xác nhận' hoặc 'Đã hủy'
+
     conn = get_db()
-    conn.execute("UPDATE CHITIET_DATPHONG SET TrangThai = 'Đã nhận' WHERE MaCTDP = ?", (ma_ctdp,))
+    cursor = conn.cursor()
+
+    # Cập nhật bảng DATPHONG
+    cursor.execute("UPDATE DATPHONG SET TrangThai = ? WHERE MaDP = ?", (new_status, ma_dp))
+
+    # Nếu hủy đơn, hủy luôn các chi tiết phòng
+    if new_status == 'Đã hủy':
+        cursor.execute("UPDATE CHITIET_DATPHONG SET TrangThai = 'Đã hủy' WHERE MaDP = ?", (ma_dp,))
+
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": f"Đã chuyển đơn #{ma_dp} sang {new_status}"})
+
+
+# 2. API Danh sách Check-in (Cập nhật logic Gán/Xác nhận)
+@app.route('/api/rec/checkin-list', methods=['GET'])
+def get_checkin_list():
+    search = request.args.get('search', '')
+    status_filter = request.args.get('status_filter', 'all')  # Nhận tham số lọc
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    sql = """
+        SELECT DP.*, KH.HoTen, KH.SDT,
+               CT.MaCTDP, CT.MaPhong, CT.MaLoai, CT.NgayNhan, CT.NgayTra, 
+               CT.TrangThai as TrangThaiCT, P.SoPhong, LP.TenLoai
+        FROM DATPHONG DP
+        JOIN KHACHHANG KH ON DP.MaKH = KH.MaKH
+        JOIN CHITIET_DATPHONG CT ON DP.MaDP = CT.MaDP
+        JOIN LOAIPHONG LP ON CT.MaLoai = LP.MaLoai
+        LEFT JOIN PHONG P ON CT.MaPhong = P.MaPhong
+        WHERE 1=1
+    """
+    params = []
+
+    # 1. Lọc theo tìm kiếm
+    if search:
+        sql += " AND (DP.MaDP LIKE ? OR KH.HoTen LIKE ? OR KH.SDT LIKE ?)"
+        params.extend([f'%{search}%', f'%{search}%', f'%{search}%'])
+
+    # 2. Lọc theo trạng thái đơn (QUAN TRỌNG)
+    if status_filter != 'all':
+        sql += " AND DP.TrangThai = ?"
+        params.append(status_filter)
+    else:
+        # Nếu để 'all', có thể mặc định ẩn các đơn 'Đã hủy' hoặc hiện hết tùy bạn
+        # Ở đây tôi cho hiện hết theo yêu cầu của bạn
+        pass
+
+    sql += " ORDER BY DP.NgayTao DESC"
+    cursor.execute(sql, params)
+    rows = cursor.fetchall()
+    conn.close()
+
+    # Gộp dữ liệu theo MaDP (Giữ nguyên logic cũ)
+    bookings_dict = {}
+    for row in rows:
+        ma_dp = row['MaDP']
+        if ma_dp not in bookings_dict:
+            bookings_dict[ma_dp] = dict(row)
+            bookings_dict[ma_dp]['ChiTiet'] = []
+        bookings_dict[ma_dp]['ChiTiet'].append(dict(row))
+
+    results = list(bookings_dict.values())
+    for b in results:
+        # Logic tính toán nút Xác nhận đơn hàng (CanConfirm)
+        all_assigned = all(ct['MaPhong'] is not None for ct in b['ChiTiet'])
+        b['CanConfirm'] = (b['TrangThai'] == 'Chờ xác nhận' and all_assigned)
+
+    return jsonify(results)
+
+
+# 2. API Check-in cho từng Chi tiết đặt phòng
+@app.route('/api/rec/checkin-detail/<int:ma_ctdp>', methods=['POST'])
+def api_checkin_detail(ma_ctdp):
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # 1. Cập nhật trạng thái Chi tiết đặt phòng
+    cursor.execute("UPDATE CHITIET_DATPHONG SET TrangThai = 'Đã nhận' WHERE MaCTDP = ?", (ma_ctdp,))
+
+    # 2. Lấy MaDP của chi tiết này để cập nhật đơn đặt tổng
+    cursor.execute("SELECT MaDP FROM CHITIET_DATPHONG WHERE MaCTDP = ?", (ma_ctdp,))
+    ma_dp = cursor.fetchone()[0]
+
+    # 3. Chuyển trạng thái DATPHONG thành 'Đang lưu trú'
+    cursor.execute("UPDATE DATPHONG SET TrangThai = 'Đang lưu trú' WHERE MaDP = ?", (ma_dp,))
+
     conn.commit()
     conn.close()
     return jsonify({"status": "success"})
 
-# Kt rooms_assign_rec
+# Kt checkin_rec
+
+# services_manage_rec
+@app.route('/api/rec/service-orders', methods=['GET'])
+def get_service_orders():
+    # Lấy tham số lọc
+    status_filter = request.args.get('status', 'all')
+    start_date = request.args.get('start_date', '')
+    end_date = request.args.get('end_date', '')
+    search = request.args.get('search', '')
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    sql = """
+        SELECT 
+            PDV.MaPDV, PDV.MaCTDP, PDV.DonGia, PDV.SoLuong, PDV.Ngay, PDV.Gio, 
+            PDV.TrangThai as OrderStatus,
+            DV.TenDV, DV.TrangThai as CatalogStatus,
+            P.SoPhong, KH.HoTen
+        FROM DATPHONG_DICHVU PDV
+        JOIN DICHVU DV ON PDV.MaDV = DV.MaDV
+        JOIN CHITIET_DATPHONG CT ON PDV.MaCTDP = CT.MaCTDP
+        JOIN DATPHONG DP ON CT.MaDP = DP.MaDP
+        JOIN KHACHHANG KH ON DP.MaKH = KH.MaKH
+        LEFT JOIN PHONG P ON CT.MaPhong = P.MaPhong
+        WHERE 1=1
+    """
+    params = []
+
+    if status_filter != 'all':
+        sql += " AND PDV.TrangThai = ?"
+        params.append(status_filter)
+
+    if start_date:
+        sql += " AND PDV.Ngay >= ?"
+        params.append(start_date)
+
+    if end_date:
+        sql += " AND PDV.Ngay <= ?"
+        params.append(end_date)
+
+    if search:
+        sql += " AND (P.SoPhong LIKE ? OR KH.HoTen LIKE ? OR DV.TenDV LIKE ?)"
+        params.extend([f'%{search}%', f'%{search}%', f'%{search}%'])
+
+    sql += " ORDER BY PDV.Ngay DESC, PDV.Gio DESC"
+    cursor.execute(sql, params)
+    orders = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return jsonify(orders)
+
+# API 2: Lấy danh mục tất cả dịch vụ của khách sạn (Cho Tab 2)
+@app.route('/api/rec/service-catalog', methods=['GET'])
+def get_service_catalog():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM DICHVU ORDER BY TenDV ASC")
+    services = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return jsonify(services)
+
+@app.route('/api/rec/update-service-status', methods=['POST'])
+def update_service_status():
+    data = request.json
+    ma_pdv = data.get('ma_pdv')
+    new_status = data.get('status')  # 'Đã phục vụ' hoặc 'Đã hủy'
+
+    conn = get_db()
+    conn.execute("UPDATE DATPHONG_DICHVU SET TrangThai = ? WHERE MaPDV = ?", (new_status, ma_pdv))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success"})
+
+# Kt services_manage_rec
+
 
 # customer_list_rec
 @app.route('/api/rec/customers', methods=['GET'])
 def api_get_customers():
     search = request.args.get('search', '')
+    status_filter = request.args.get('status_filter', 'all')
     today = date.today().isoformat()
 
     conn = get_db()
     cursor = conn.cursor()
 
     sql = f"""
-            SELECT 
-                KH.MaKH, KH.HoTen, KH.SDT, KH.Email,
-                (SELECT COUNT(*) FROM DATPHONG WHERE MaKH = KH.MaKH AND TrangThai = 'Hoàn tất') as SoDonThanhCong,
-                -- Đếm số đơn đang Chờ xác nhận
-                (SELECT COUNT(*) FROM DATPHONG WHERE MaKH = KH.MaKH AND TrangThai = 'Chờ xác nhận') as CoDonChoXacNhan,
+                SELECT 
+                    KH.MaKH, KH.HoTen, KH.SDT, KH.Email,
+                    -- (Các trường cũ giữ nguyên...)
+                    (SELECT COUNT(*) FROM DATPHONG WHERE MaKH = KH.MaKH AND TrangThai = 'Hoàn tất') as SoDonThanhCong,
+                    (SELECT COUNT(*) FROM DATPHONG WHERE MaKH = KH.MaKH AND TrangThai = 'Chờ xác nhận') as CoDonChoXacNhan,
+                    (SELECT GROUP_CONCAT(P.SoPhong, ', ') FROM CHITIET_DATPHONG CT JOIN DATPHONG DP ON CT.MaDP = DP.MaDP JOIN PHONG P ON CT.MaPhong = P.MaPhong WHERE DP.MaKH = KH.MaKH AND DP.TrangThai = 'Đang lưu trú') as CacPhongDangO,
+                    (SELECT COUNT(*) FROM CHITIET_DATPHONG CT JOIN DATPHONG DP ON CT.MaDP = DP.MaDP WHERE DP.MaKH = KH.MaKH AND CT.NgayNhan = '{today}' AND DP.TrangThai = 'Đã xác nhận') as CoCheckinHomNay,
+                    (SELECT COUNT(*) FROM CHITIET_DATPHONG CT JOIN DATPHONG DP ON CT.MaDP = DP.MaDP WHERE DP.MaKH = KH.MaKH AND CT.NgayTra = '{today}' AND DP.TrangThai = 'Đang lưu trú') as CoCheckoutHomNay,
+                    (SELECT COUNT(*) FROM CHITIET_DATPHONG CT JOIN DATPHONG DP ON CT.MaDP = DP.MaDP WHERE DP.MaKH = KH.MaKH AND CT.MaPhong IS NULL AND DP.TrangThai = 'Đã xác nhận') as ChuaGanPhong,
 
-                (SELECT GROUP_CONCAT(P.SoPhong, ', ') 
-                 FROM CHITIET_DATPHONG CT 
-                 JOIN DATPHONG DP ON CT.MaDP = DP.MaDP
-                 JOIN PHONG P ON CT.MaPhong = P.MaPhong
-                 WHERE DP.MaKH = KH.MaKH AND DP.TrangThai = 'Đang lưu trú') as CacPhongDangO,
-
-                (SELECT COUNT(*) FROM CHITIET_DATPHONG CT JOIN DATPHONG DP ON CT.MaDP = DP.MaDP 
-                 WHERE DP.MaKH = KH.MaKH AND CT.NgayNhan = '{today}' AND DP.TrangThai = 'Đã xác nhận') as CoCheckinHomNay,
-
-                (SELECT COUNT(*) FROM CHITIET_DATPHONG CT JOIN DATPHONG DP ON CT.MaDP = DP.MaDP 
-                 WHERE DP.MaKH = KH.MaKH AND CT.NgayTra = '{today}' AND DP.TrangThai = 'Đang lưu trú') as CoCheckoutHomNay,
-
-                (SELECT COUNT(*) FROM CHITIET_DATPHONG CT JOIN DATPHONG DP ON CT.MaDP = DP.MaDP 
-                 WHERE DP.MaKH = KH.MaKH AND CT.MaPhong IS NULL AND DP.TrangThai = 'Đã xác nhận') as ChuaGanPhong
-            FROM KHACHHANG KH
-            WHERE 1=1
-        """
+                    -- MỚI: Đếm các phòng sẽ đến trong tương lai
+                    (SELECT COUNT(*) FROM CHITIET_DATPHONG CT JOIN DATPHONG DP ON CT.MaDP = DP.MaDP 
+                     WHERE DP.MaKH = KH.MaKH AND CT.NgayNhan > '{today}' 
+                     AND DP.TrangThai IN ('Chờ xác nhận', 'Đã xác nhận')) as CoDonTuongLai
+                FROM KHACHHANG KH
+                WHERE 1=1
+            """
     params = []
+
+    # 1. Lọc theo tìm kiếm (Tên, SĐT, Email)
     if search:
         sql += " AND (KH.HoTen LIKE ? OR KH.SDT LIKE ? OR KH.Email LIKE ?)"
         params.extend([f'%{search}%', f'%{search}%', f'%{search}%'])
+
+    # 2. Lọc theo Tình trạng hiện tại (Dùng EXISTS để lọc chính xác)
+    if status_filter == 'dang_o':
+        sql += " AND EXISTS (SELECT 1 FROM DATPHONG WHERE MaKH = KH.MaKH AND TrangThai = 'Đang lưu trú')"
+
+    elif status_filter == 'sap_den':
+        # Khách có phòng check-in từ hôm nay trở đi và đơn đã xác nhận/chờ xác nhận
+        sql += f""" AND EXISTS (
+            SELECT 1 FROM CHITIET_DATPHONG CT 
+            JOIN DATPHONG DP ON CT.MaDP = DP.MaDP 
+            WHERE DP.MaKH = KH.MaKH AND CT.NgayNhan >= '{today}' AND DP.TrangThai IN ('Chờ xác nhận', 'Đã xác nhận')
+        )"""
+
+    elif status_filter == 'cho_xac_nhan':
+        sql += " AND EXISTS (SELECT 1 FROM DATPHONG WHERE MaKH = KH.MaKH AND TrangThai = 'Chờ xác nhận')"
+
+    elif status_filter == 'chua_gan_phong':
+        sql += " AND EXISTS (SELECT 1 FROM CHITIET_DATPHONG CT JOIN DATPHONG DP ON CT.MaDP = DP.MaDP WHERE DP.MaKH = KH.MaKH AND CT.MaPhong IS NULL AND DP.TrangThai = 'Đã xác nhận')"
 
     cursor.execute(sql, params)
     customers = [dict(row) for row in cursor.fetchall()]
@@ -261,46 +533,72 @@ def api_customer_history(ma_kh):
     conn = get_db()
     cursor = conn.cursor()
 
-    # Lấy toàn bộ chi tiết của tất cả các đơn khách đã đặt
+    # Truy vấn lấy cả thông tin Phòng và Dịch vụ đi kèm của từng phòng
     sql = """
         SELECT 
             DP.MaDP, DP.NgayTao, DP.TongTien, DP.TrangThai as TrangThaiDon,
             CT.MaCTDP, CT.GiaPhong, CT.NgayNhan, CT.NgayTra, CT.TrangThai as TrangThaiPhong,
-            LP.TenLoai, P.SoPhong
+            LP.TenLoai, P.SoPhong,
+            DV.TenDV, DPDV.SoLuong, DPDV.DonGia as GiaDV, DPDV.TrangThai as TrangThaiDV, DPDV.Ngay as NgayDV
         FROM DATPHONG DP
         JOIN CHITIET_DATPHONG CT ON DP.MaDP = CT.MaDP
         JOIN LOAIPHONG LP ON CT.MaLoai = LP.MaLoai
         LEFT JOIN PHONG P ON CT.MaPhong = P.MaPhong
+        LEFT JOIN DATPHONG_DICHVU DPDV ON CT.MaCTDP = DPDV.MaCTDP
+        LEFT JOIN DICHVU DV ON DPDV.MaDV = DV.MaDV
         WHERE DP.MaKH = ?
-        ORDER BY DP.NgayTao DESC, DP.MaDP DESC
+        ORDER BY DP.NgayTao DESC, DP.MaDP DESC, CT.MaCTDP DESC
     """
     cursor.execute(sql, (ma_kh,))
     rows = cursor.fetchall()
     conn.close()
 
-    # Tổ chức lại dữ liệu: Gộp các CTDP vào trong DP tương ứng
     bookings_dict = {}
     for row in rows:
         ma_dp = row['MaDP']
+        ma_ctdp = row['MaCTDP']
+
+        # 1. Khởi tạo Đơn hàng (Booking)
         if ma_dp not in bookings_dict:
             bookings_dict[ma_dp] = {
                 "MaDP": ma_dp,
                 "NgayTao": row['NgayTao'],
                 "TongTien": row['TongTien'],
                 "TrangThaiDon": row['TrangThaiDon'],
-                "ChiTiet": []
+                "ChiTietPhong": {}  # Dùng dict để gộp dịch vụ vào đúng phòng
             }
 
-        bookings_dict[ma_dp]["ChiTiet"].append({
-            "MaCTDP": row['MaCTDP'],
-            "SoPhong": row['SoPhong'],
-            "TenLoai": row['TenLoai'],
-            "GiaPhong": row['GiaPhong'],
-            "NgayNhan": row['NgayNhan'],
-            "NgayTra": row['NgayTra'],
-            "TrangThaiPhong": row['TrangThaiPhong']
-        })
+        # 2. Khởi tạo/Lấy thông tin Phòng (Room)
+        if ma_ctdp not in bookings_dict[ma_dp]["ChiTietPhong"]:
+            bookings_dict[ma_dp]["ChiTietPhong"][ma_ctdp] = {
+                "MaCTDP": ma_ctdp,
+                "SoPhong": row['SoPhong'],
+                "TenLoai": row['TenLoai'],
+                "GiaPhong": row['GiaPhong'],
+                "NgayNhan": row['NgayNhan'],
+                "NgayTra": row['NgayTra'],
+                "TrangThaiPhong": row['TrangThaiPhong'],
+                "DichVu": []
+            }
 
-    return jsonify(list(bookings_dict.values()))
+        # 3. Thêm Dịch vụ vào phòng (nếu có)
+        if row['TenDV']:
+            bookings_dict[ma_dp]["ChiTietPhong"][ma_ctdp]["DichVu"].append({
+                "TenDV": row['TenDV'],
+                "SoLuong": row['SoLuong'],
+                "GiaDV": row['GiaDV'],
+                "NgayDV": row['NgayDV'],
+                "TrangThaiDV": row['TrangThaiDV']
+            })
+
+    # Chuyển đổi cấu trúc dict về list để JSON trả về mảng
+    result = []
+    for dp_id in bookings_dict:
+        # Biến ChiTietPhong từ dict thành list
+        bookings_dict[dp_id]["ChiTiet"] = list(bookings_dict[dp_id]["ChiTietPhong"].values())
+        del bookings_dict[dp_id]["ChiTietPhong"]
+        result.append(bookings_dict[dp_id])
+
+    return jsonify(result)
 # Kt customer_list_rec
 

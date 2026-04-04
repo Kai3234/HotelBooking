@@ -3,13 +3,16 @@
 {% block page_title %}Tra cứu & Gán phòng cho khách{% endblock %}
 
 {% block content %}
-<!-- 1. THANH CÔNG CỤ -->
+<!-- 1. THANH CÔNG CỤ TẠI -->
 <div class="card" style="margin-bottom: 20px; padding: 15px 25px;">
     <form method="GET" action="{{ url_for('rooms_assign_rec') }}" class="toolbar">
-        <div class="search-box">
+        <div class="search-box" style="width: 400px;">
             <i class="fa-solid fa-search"></i>
-            <input type="text" name="search" value="{{ search_query }}" placeholder="Mã đơn, Mã CT, Tên khách...">
+            <!-- Ô này sẽ tự động nhận giá trị search_query từ URL -->
+            <input type="text" name="search" value="{{ search_query }}"
+                   placeholder="Nhập chính xác Mã đơn (MaDP), Mã CT hoặc Tên khách...">
         </div>
+
         <div class="filter-group">
             <select name="status" class="form-control" style="width: 180px;">
                 <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Tất cả đơn</option>
@@ -17,7 +20,14 @@
                 <option value="da_gan" {% if status_filter == 'da_gan' %}selected{% endif %}>Đã gán (Chờ check-in)</option>
                 <option value="dang_o" {% if status_filter == 'dang_o' %}selected{% endif %}>Đang lưu trú</option>
             </select>
-            <button type="submit" class="btn btn-primary">Lọc</button>
+            <button type="submit" class="btn btn-primary">Lọc / Tìm kiếm</button>
+
+            <!-- Thêm nút làm mới để quay lại danh sách tổng nhanh chóng -->
+            {% if search_query %}
+            <a href="{{ url_for('rooms_assign_rec') }}" class="btn btn-outline" title="Xóa tìm kiếm">
+                <i class="fa-solid fa-rotate-left"></i>
+            </a>
+            {% endif %}
         </div>
     </form>
 </div>
@@ -70,11 +80,7 @@
                                     <i class="fa-solid fa-key"></i> Gán phòng
                                 </button>
                             {% else %}
-                                <!-- Nếu đã gán: Hiện Check-in, Đổi phòng và Hủy gán -->
-                                <a href="{{ url_for('checkin', ma_ctdp=b.MaCTDP) }}" class="btn-sm btn-primary">
-                                    <i class="fa-solid fa-clipboard-check"></i> Check-in
-                                </a>
-
+                                <!-- Nếu đã gán: Hiện Đổi phòng và Hủy gán -->
                                 <button class="btn-sm btn-outline"
                                     onclick="openAssignModal('{{ b.MaDP }}', '{{ b.MaCTDP }}', '{{ b.HoTen }}', '{{ b.TenLoai }}', '{{ b.MaLoai }}', '{{ b.NgayNhan }}', '{{ b.NgayTra }}', '{{ b.MaPhong }}')">
                                     <i class="fa-solid fa-pen"></i> Đổi
@@ -104,7 +110,7 @@
     <div class="modal-content">
         <div class="modal-header">
             <h3>Gán Phòng Thực Tế</h3>
-            <button onclick="closeAssignModal()">&times;</button>
+            <button class="btn-close" onclick="closeAssignModal()"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <form action="{{ url_for('assign_room') }}" method="POST">
             <div class="modal-body">

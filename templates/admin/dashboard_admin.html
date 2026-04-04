@@ -2,103 +2,123 @@
 
 {% block title %}Dashboard{% endblock %}
 
-{% block page_title %}Trang Dashboard{% endblock %}
+{% block page_title %}Dashboard cho Admin{% endblock %}
 
 {% block content %}
-<!-- 8 Ô THỐNG KÊ -->
-<div class="widget-grid">
+<!-- 1. NHÓM THỐNG KÊ CHUNG (TRÊN BỘ LỌC) -->
+<div class="menu-header" style="margin-bottom: 15px;">Tổng quan hệ thống</div>
+<div class="widget-grid" style="margin-bottom: 25px;">
     <div class="widget-card">
-        <div class="widget-icon green"><i class="fa-solid fa-money-bill-trend-up"></i></div>
+        <div class="widget-icon green"><i class="fa-solid fa-coins"></i></div>
         <div class="widget-info">
-            <h4>{{ "{:,.0f}".format(stats.widget.revenue_month or 0) }}₫</h4>
-            <p>Doanh thu tháng</p>
-        </div>
-    </div>
-    <div class="widget-card">
-        <div class="widget-icon red"><i class="fa-solid fa-cart-shopping"></i></div>
-        <div class="widget-info">
-            <h4>{{ stats.widget.total_bookings or 0 }}</h4>
-            <p>Tổng đơn đặt</p>
-        </div>
-    </div>
-    <div class="widget-card">
-        <div class="widget-icon red"><i class="fa-solid fa-clock"></i></div>
-        <div class="widget-info">
-            <h4>{{ stats.widget.pending_confirm or 0 }}</h4>
-            <p>Chờ xác nhận</p>
-        </div>
-    </div>
-    <div class="widget-card">
-        <div class="widget-icon green"><i class="fa-solid fa-user-check"></i></div>
-        <div class="widget-info">
-            <h4>{{ stats.widget.staying_guests or 0 }}</h4>
-            <p>Khách đang ở</p>
+            <h4>{{ "{:,.0f}".format(stats.general.revenue_all or 0) }}₫</h4>
+            <p>Tổng doanh thu</p>
         </div>
     </div>
     <div class="widget-card">
         <div class="widget-icon green"><i class="fa-solid fa-door-open"></i></div>
         <div class="widget-info">
-            <h4>{{ stats.widget.available_rooms or 0 }}</h4>
+            <h4>{{ stats.general.available or 0 }}</h4>
             <p>Phòng sẵn sàng</p>
         </div>
     </div>
     <div class="widget-card">
         <div class="widget-icon red"><i class="fa-solid fa-screwdriver-wrench"></i></div>
         <div class="widget-info">
-            <h4>{{ stats.widget.maintenance_rooms or 0 }}</h4>
+            <h4>{{ stats.general.maintenance or 0 }}</h4>
             <p>Phòng bảo trì</p>
         </div>
     </div>
     <div class="widget-card">
-        <div class="widget-icon red"><i class="fa-solid fa-users"></i></div>
+        <div class="widget-icon red"><i class="fa-solid fa-boxes-stacked"></i></div>
         <div class="widget-info">
-            <h4>{{ stats.widget.total_customers or 0 }}</h4>
-            <p>Khách hàng</p>
-        </div>
-    </div>
-    <div class="widget-card">
-        <div class="widget-icon green"><i class="fa-solid fa-concierge-bell"></i></div>
-        <div class="widget-info">
-            <h4>{{ stats.widget.pending_services or 0 }}</h4>
-            <p>Dịch vụ chờ</p>
+            <h4>{{ stats.general.bookings_all or 0 }}</h4>
+            <p>Tổng đơn đặt</p>
         </div>
     </div>
 </div>
 
-<!-- KHỐI BIỂU ĐỒ (BỔ SUNG PHẦN NÀY) -->
-<div class="card">
-    <div class="card-header">
-        <div class="card-title">
-            <i class="fa-solid fa-chart-area" style="color: var(--primary-red); margin-right: 10px;"></i>
-            Doanh thu 7 ngày gần nhất
+<!-- 2. BỘ LỌC THÁNG NĂM -->
+<div class="card" style="margin-bottom: 25px; padding: 15px 25px;">
+    <form action="{{ url_for('dashboard_admin') }}" method="GET" class="toolbar" style="margin-bottom: 0;">
+        <div class="card-title" style="margin-bottom: 0;">
+            <i class="fa-solid fa-filter" style="color: var(--primary-red);"></i> Bộ lọc báo cáo
+        </div>
+        <div class="filter-group">
+            <select name="month" class="form-control" onchange="this.form.submit()">
+                {% for m in range(1, 13) %}
+                <option value="{{ m }}" {% if m == current_month %}selected{% endif %}>Tháng {{ m }}</option>
+                {% endfor %}
+            </select>
+            <select name="year" class="form-control" onchange="this.form.submit()">
+                {% for y in years_list %}
+                <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>Năm {{ y }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </form>
+</div>
+
+<!-- 3. NHÓM THỐNG KÊ THEO THÁNG (DƯỚI BỘ LỌC) -->
+<div class="menu-header" style="margin-bottom: 15px;">Báo cáo tháng {{ current_month }}/{{ current_year }}</div>
+<div class="widget-grid" style="margin-bottom: 25px;">
+    <div class="widget-card">
+        <div class="widget-icon green"><i class="fa-solid fa-money-bill-trend-up"></i></div>
+        <div class="widget-info">
+            <h4>{{ "{:,.0f}".format(stats.monthly.revenue_month or 0) }}₫</h4>
+            <p>Doanh thu tháng</p>
         </div>
     </div>
-    <div class="card-body">
-        <div style="position: relative; height: 350px;">
-            <canvas id="revenueChart"></canvas>
+    <div class="widget-card">
+        <div class="widget-icon red"><i class="fa-solid fa-receipt"></i></div>
+        <div class="widget-info">
+            <h4>{{ stats.monthly.bookings_month or 0 }}</h4>
+            <p>Đơn đặt tháng</p>
         </div>
+    </div>
+    <div class="widget-card">
+        <div class="widget-icon red"><i class="fa-solid fa-ban"></i></div>
+        <div class="widget-info">
+            <h4>{{ stats.monthly.canceled_month or 0 }}</h4>
+            <p>Đơn đã hủy</p>
+        </div>
+    </div>
+    <div class="widget-card">
+        <div class="widget-icon green"><i class="fa-solid fa-user-tag"></i></div>
+        <div class="widget-info">
+            <h4>{{ stats.monthly.customers_month or 0 }}</h4>
+            <p>Khách đặt phòng</p>
+        </div>
+    </div>
+</div>
+
+<!-- 4. BIỂU ĐỒ DOANH THU THÁNG -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Biểu đồ doanh thu tháng {{ current_month }}</div>
+    </div>
+    <div class="card-body">
+        <div style="height: 350px;"><canvas id="revenueChart"></canvas></div>
     </div>
 </div>
 
 <!-- SCRIPT BIỂU ĐỒ -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <script>
-    // Kiểm tra nếu canvas tồn tại mới vẽ để tránh lỗi JS
     const ctx = document.getElementById('revenueChart').getContext('2d');
     new Chart(ctx, {
         type: 'line',
         data: {
-            // Sửa stats.chart.labels thành stats.chart['labels']
             labels: {{ stats.chart['labels'] | tojson }},
             datasets: [{
                 label: 'Doanh thu (VNĐ)',
-                // Sửa stats.chart.values thành stats.chart['values']
                 data: {{ stats.chart['values'] | tojson }},
                 borderColor: '#C8102E',
                 backgroundColor: 'rgba(200, 16, 46, 0.1)',
                 fill: true,
-                tension: 0.4
+                tension: 0.4,
+                pointRadius: 4,
+                borderWidth: 2
             }]
         },
         options: {
@@ -117,6 +137,6 @@
             }
         }
     });
-
 </script>
+
 {% endblock %}

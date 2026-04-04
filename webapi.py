@@ -14,25 +14,40 @@ def get_db():
 
 @app.route('/login', methods=['POST'])
 def login_api():
-    # Lấy dữ liệu JSON được gửi từ Frontend (cổng 5001)
     data = request.get_json()
     if not data:
-        return jsonify({"status": "error", "message": "Dữ liệu gửi lên không hợp lệ!"}), 400
+        return jsonify({
+            "status": "error",
+            "message": "Dữ liệu gửi lên không hợp lệ!"
+        }), 400
 
-    email= data.get('email')
+    email = data.get('email')
     password = data.get('password')
     role = data.get('role')
 
     conn = get_db()
 
-    # --- 1. XỬ LÝ CHO NHÂN VIÊN ---
+    # ==========================
+    # 1. LOGIN NHÂN VIÊN
+    # ==========================
     if role == 'nhanvien':
-        # Lưu ý: Theo schema trước đó NHANVIEN đăng nhập bằng SDT.
-        # Nếu bạn đã thêm cột Email vào NHANVIEN thì hãy đổi `SDT = ?` thành `Email = ?`
-        query = "SELECT * FROM NHANVIEN WHERE Email = ? AND MatKhau = ?"
+        query = """
+            SELECT *
+            FROM NHANVIEN
+            WHERE Email = ? AND MatKhau = ?
+        """
+
         user = conn.execute(query, (email, password)).fetchone()
 
         if user:
+            # kiểm tra trạng thái
+            if user['TrangThai'] == 'Khóa':
+                conn.close()
+                return jsonify({
+                    "status": "error",
+                    "message": "Tài khoản đã bị khóa!"
+                }), 200
+
             conn.close()
             return jsonify({
                 "status": "success",
@@ -43,28 +58,44 @@ def login_api():
                 }
             })
 
-    # --- 2. XỬ LÝ CHO KHÁCH HÀNG ---
+    # ==========================
+    # 2. LOGIN KHÁCH HÀNG
+    # ==========================
     elif role == 'khachhang':
-        query = "SELECT * FROM KHACHHANG WHERE Email = ? AND MatKhau = ?"
+        query = """
+            SELECT *
+            FROM KHACHHANG
+            WHERE Email = ? AND MatKhau = ?
+        """
+
         user = conn.execute(query, (email, password)).fetchone()
 
         if user:
+
+            # kiểm tra trạng thái
+            if user['TrangThai'] == 'Khóa':
+                conn.close()
+                return jsonify({
+                    "status": "error",
+                    "message": "Tài khoản đã bị khóa!"
+                }), 200
+
             conn.close()
             return jsonify({
                 "status": "success",
                 "data": {
                     "MaTK": user['MaKH'],
                     "HoTen": user['HoTen'],
-                    "LaAdmin": 0 # Khách hàng không có quyền Admin
+                    "LaAdmin": 0
                 }
             })
 
     conn.close()
-    # Trả về lỗi nếu không tìm thấy User hoặc mật khẩu sai
+
     return jsonify({
         "status": "error",
         "message": "Thông tin đăng nhập hoặc mật khẩu không chính xác!"
-    }), 200 # Frontend của bạn kiểm tra status_code == 200 để lấy JSON nên để 200
+    }), 200
 
 
 @app.route('/register', methods=['POST'])

@@ -1,127 +1,164 @@
 {% extends 'layout/base_backend.html' %}
 
 {% block title %}Quản lý Check-in - RedHotel{% endblock %}
-{% block page_title %}Xác nhận Check-in (Nhận phòng){% endblock %}
+{% block page_title %}Danh sách Đơn đặt & Thủ tục Check-in{% endblock %}
 
 {% block content %}
 
-<!-- THANH CÔNG CỤ -->
+<!-- 1. THANH CÔNG CỤ -->
 <div class="card" style="margin-bottom: 20px; padding: 15px 25px;">
-    <div class="toolbar" style="margin-bottom: 0;">
-        <div class="search-box">
+    <form method="GET" action="{{ url_for('checkin_rec') }}" class="toolbar" style="margin-bottom: 0;">
+        <div class="search-box" style="width: 350px;">
             <i class="fa-solid fa-search"></i>
-            <input type="text" placeholder="Tìm Mã đơn, Tên khách đến hôm nay...">
+            <input type="text" name="search" value="{{ search_query }}" placeholder="Mã đơn, Tên hoặc SĐT khách...">
         </div>
         <div class="filter-group">
-            <button class="btn btn-outline"><i class="fa-regular fa-calendar-days"></i> Chỉ hiện khách đến hôm nay</button>
+            <label style="font-weight: 600; font-size: 14px;">Trạng thái đơn:</label>
+            <select name="status_filter" class="form-control" style="width: 180px;" onchange="this.form.submit()">
+                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Tất cả trạng thái</option>
+                <option value="Chờ xác nhận" {% if status_filter == 'Chờ xác nhận' %}selected{% endif %}>Chờ xác nhận</option>
+                <option value="Đã xác nhận" {% if status_filter == 'Đã xác nhận' %}selected{% endif %}>Đã xác nhận - Chờ Check-in</option>
+                <option value="Đang lưu trú" {% if status_filter == 'Đang lưu trú' %}selected{% endif %}>Đang lưu trú - Đã nhận</option>
+                <option value="Hoàn tất" {% if status_filter == 'Hoàn tất' %}selected{% endif %}>Hoàn tất</option>
+                <option value="Đã hủy" {% if status_filter == 'Đã hủy' %}selected{% endif %}>Đã hủy</option>
+            </select>
+            <button type="submit" class="btn btn-primary">Lọc</button>
         </div>
-    </div>
+    </form>
 </div>
 
-<!-- BẢNG DANH SÁCH CHỜ CHECK-IN -->
-<div class="card">
-    <div class="table-responsive">
-        <table>
+<!-- 2. DANH SÁCH ĐƠN ĐẶT PHÒNG -->
+{% for dp in bookings %}
+<div class="card" style="margin-bottom: 25px; border-left: 5px solid
+    {% if dp.TrangThai == 'Chờ xác nhận' %}#FFA800
+    {% elif dp.TrangThai == 'Đang lưu trú' %}#009EF7
+    {% elif dp.TrangThai == 'Hoàn tất' %}#50CD89
+    {% elif dp.TrangThai == 'Đã hủy' %}#F1416C
+    {% else %}#E1F0FF{% endif %};">
+
+    <div class="card-header">
+        <div style="display: flex; justify-content: space-between; width: 100%;">
+            <div>
+                <span class="badge
+                    {% if dp.TrangThai == 'Chờ xác nhận' %}badge-warning
+                    {% elif dp.TrangThai == 'Đang lưu trú' %}badge-info
+                    {% elif dp.TrangThai == 'Hoàn tất' %}badge-success
+                    {% elif dp.TrangThai == 'Đã hủy' %}badge-danger
+                    {% else %}badge-secondary{% endif %}">
+                    {{ dp.TrangThai }}
+                </span>
+                <h3 style="margin-top: 5px;">Đơn: <strong style="color: var(--primary-red);">#{{ dp.MaDP }}</strong> - {{ dp.HoTen }}</h3>
+            </div>
+            <div style="text-align: right;">
+                <strong style="font-size: 18px;">{{ "{:,.0f}".format(dp.TongTien) }}₫</strong>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="card-body" style="padding: 0;">
+        <table style="margin-bottom: 0;">
             <thead>
-                <tr>
-                    <th>Mã Đơn</th>
-                    <th>Khách Hàng</th>
-                    <th>Phòng Đã Gán</th>
+                <tr style="background: #f8f9fa;">
+                    <th style="padding-left: 25px; width: 100px;">Mã CT</th> <!-- CỘT MỚI THÊM -->
+                    <th style="width: 200px;">Loại Phòng</th>
                     <th>Ngày Nhận - Trả</th>
-                    <th>Trạng Thái</th>
-                    <th>Hành Động</th>
+                    <th>Số phòng</th>
+                    <th>Trạng thái phòng</th>
+                    <th>Thao tác</th>
                 </tr>
             </thead>
             <tbody>
-                <!-- ĐƠN HỢP LỆ ĐỂ CHECK-IN -->
-                <tr>
-                    <td><strong>#DP1005</strong></td>
-                    <td>
-                        <span style="font-weight: 600;">Lý Mạc Sầu</span><br>
-                        <small style="color: gray;">0933445566</small>
-                    </td>
-                    <td>
-                        <span style="color: var(--primary-red); font-weight: 600;">Phòng 201</span><br>
-                        <small>Deluxe Hướng Biển</small>
-                    </td>
-                    <td>02/04/2026 <i class="fa-solid fa-arrow-right" style="font-size: 10px; color: gray;"></i> 05/04/2026</td>
-                    <td><span class="badge badge-success" style="background-color: #E1F0FF; color: #009EF7;">Đã gán phòng</span></td>
-                    <td>
-                        <button class="btn-sm btn-primary" onclick="openCheckinModal('DP1005', 'Lý Mạc Sầu', 'Phòng 201')">
-                            <i class="fa-solid fa-clipboard-check"></i> Xác nhận Check-in
-                        </button>
-                    </td>
-                </tr>
+    {% for ct in dp.ChiTiet %}
+    <tr>
+        <td style="padding-left: 25px;">
+            <small style="font-weight: 600; color: #7E8299;">#{{ ct.MaCTDP }}</small>
+        </td>
+        <td>
+            <strong style="font-size: 14px; color: var(--text-dark);">{{ ct.TenLoai }}</strong>
+        </td>
+        <td>
+            <span style="{% if ct.NgayNhan == today %}color: #009EF7; font-weight: bold;{% endif %}">
+                {{ ct.NgayNhan }}
+            </span> ➜ {{ ct.NgayTra }}
+        </td>
+        <td>
+            {% if ct.SoPhong %}
+                <b style="color: var(--primary-red); font-size: 15px;">P.{{ ct.SoPhong }}</b>
+            {% else %}
+                <span style="color: #F1416C; font-size: 12px;"><i class="fa-solid fa-circle-exclamation"></i> Chưa gán</span>
+            {% endif %}
+        </td>
+        <td>
+            <span class="badge
+                {% if ct.TrangThaiCT == 'Đã nhận' %}badge-success
+                {% elif ct.TrangThaiCT == 'Đã trả' %}badge-secondary
+                {% elif ct.TrangThaiCT == 'Đã hủy' %}badge-danger
+                {% else %}badge-warning{% endif %}" style="font-size: 10px;">
+                {{ ct.TrangThaiCT }}
+            </span>
+        </td>
+        <td>
+            <div style="display: flex; gap: 5px;">
+                <!-- LOGIC QUAN TRỌNG: Chỉ hiện nút Gán/Đổi khi đang 'Chờ nhận' -->
+                {% if ct.TrangThaiCT == 'Chờ nhận' %}
+                    <a href="{{ url_for('rooms_assign_rec', search=dp.MaDP) }}" class="btn-sm btn-outline" title="Gán hoặc đổi phòng">
+                        <i class="fa-solid fa-key"></i> Gán/Đổi
+                    </a>
 
-                <!-- ĐƠN CHƯA GÁN PHÒNG (KHÔNG THỂ CHECK-IN) -->
-                <tr>
-                    <td><strong>#DP1006</strong></td>
-                    <td>
-                        <span style="font-weight: 600;">Trương Vô Kỵ</span><br>
-                        <small style="color: gray;">0988776655</small>
-                    </td>
-                    <td>
-                        <span style="color: #F1416C; font-weight: 600;">Chưa gán phòng</span><br>
-                        <small>Suite Gia Đình VIP</small>
-                    </td>
-                    <td>02/04/2026 <i class="fa-solid fa-arrow-right" style="font-size: 10px; color: gray;"></i> 04/04/2026</td>
-                    <td><span class="badge badge-warning">Chờ nhận phòng</span></td>
-                    <td>
-                        <a href="#" class="btn-sm btn-outline"><i class="fa-solid fa-key"></i> Đi tới Gán phòng</a>
-                    </td>
-                </tr>
-            </tbody>
+                    <!-- Nút Check-in: Chỉ hiện nếu đã gán phòng và đúng ngày hôm nay -->
+                    {% if ct.SoPhong and ct.NgayNhan == today and dp.TrangThai in ['Đã xác nhận', 'Đang lưu trú'] %}
+                        <a href="{{ url_for('confirm_checkin_detail', ma_ctdp=ct.MaCTDP) }}"
+                           class="btn-sm btn-primary"
+                           onclick="return confirm('Xác nhận nhận phòng #{{ ct.MaCTDP }}?')">
+                            <i class="fa-solid fa-clipboard-check"></i> Check-in
+                        </a>
+                    {% endif %}
+                {% else %}
+                    <!-- Nếu đã nhận/trả/hủy: Hiển thị trạng thái khóa hoặc icon ổ khóa -->
+                    <small style="color: #B5B5C3;"><i class="fa-solid fa-lock"></i> Đã khóa gán</small>
+                {% endif %}
+            </div>
+        </td>
+    </tr>
+    {% endfor %}
+</tbody>
         </table>
     </div>
-</div>
 
-<!-- MODAL XÁC NHẬN CHECK-IN -->
-<div class="modal-overlay" id="checkinModal">
-    <div class="modal-content" style="width: 500px;">
-        <div class="modal-header">
-            <h3><i class="fa-solid fa-clipboard-check" style="color: var(--primary-red);"></i> Thủ Tục Check-in</h3>
-            <button class="btn-close" onclick="closeCheckinModal()"><i class="fa-solid fa-xmark"></i></button>
+    <div class="card-footer" style="display: flex; justify-content: space-between; background: #fcfcfc;">
+        <div style="font-size: 13px;">
+            {% if dp.TrangThai == 'Chờ xác nhận' %}
+                <span style="color: #FFA800;"><i class="fa-solid fa-info-circle"></i> Gán đủ phòng để xác nhận đơn.</span>
+            {% elif dp.TrangThai == 'Hoàn tất' %}
+                <span style="color: #50CD89;"><i class="fa-solid fa-check-circle"></i> Đơn hàng này đã hoàn tất.</span>
+            {% elif dp.TrangThai == 'Đã hủy' %}
+                <span style="color: #F1416C;"><i class="fa-solid fa-times-circle"></i> Đơn hàng này đã bị hủy.</span>
+            {% endif %}
         </div>
-        
-        <form action="#" method="POST">
-            <div class="modal-body">
-                <input type="hidden" name="ma_dp" id="ci_ma_dp">
-                
-                <div style="background-color: var(--bg-light); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                    <p>Mã đơn: <strong id="ci_text_ma" style="color: var(--primary-red);"></strong></p>
-                    <p>Khách hàng: <strong id="ci_text_ten"></strong></p>
-                    <p>Giao chìa khóa: <strong id="ci_text_phong" style="font-size: 16px;"></strong></p>
-                </div>
 
-                <!-- Form phụ trợ cho Lễ tân -->
-                <div class="form-group">
-                    <label>Tiền cọc giữ phòng (Tùy chọn)</label>
-                    <input type="number" class="form-control" name="tien_coc" placeholder="VD: 500000">
-                </div>
-                
-                <div style="display: flex; gap: 10px; align-items: center; margin-top: 15px;">
-                    <input type="checkbox" id="check_id" required style="width: 18px; height: 18px; accent-color: var(--primary-red);">
-                    <label for="check_id" style="font-size: 14px; font-weight: 600;">Đã thu giữ CCCD/Hộ chiếu của khách</label>
-                </div>
-            </div>
-            
-            <div class="modal-footer">
-                <button type="button" class="btn btn-outline" onclick="closeCheckinModal()">Hủy</button>
-                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Hoàn Tất Check-in</button>
-            </div>
-        </form>
+        <div style="display: flex; gap: 10px;">
+            {% if dp.TrangThai in ['Chờ xác nhận', 'Đã xác nhận'] %}
+                <button class="btn btn-outline" style="color: #F1416C;" onclick="confirmCancel('{{dp.MaDP}}')">
+                    <i class="fa-solid fa-trash"></i> Hủy đơn
+                </button>
+            {% endif %}
+
+            {% if dp.CanConfirm %}
+                <a href="{{ url_for('confirm_booking_rec', ma_dp=dp.MaDP) }}" class="btn btn-primary" style="background: #009EF7;">
+                    <i class="fa-solid fa-check-double"></i> XÁC NHẬN ĐƠN HÀNG
+                </a>
+            {% endif %}
+        </div>
     </div>
 </div>
+{% endfor %}
 
 <script>
-    function openCheckinModal(maDp, ten, phong) {
-        document.getElementById('ci_text_ma').innerText = '#' + maDp;
-        document.getElementById('ci_text_ten').innerText = ten;
-        document.getElementById('ci_text_phong').innerText = phong;
-        document.getElementById('ci_ma_dp').value = maDp;
-        document.getElementById('checkinModal').classList.add('show');
+    function confirmCancel(maDp) {
+        if(confirm('Bạn có chắc chắn muốn HỦY đơn #' + maDp + '?')) {
+            window.location.href = "{{ url_for('cancel_booking', ma_dp='0') }}".replace('0', maDp);
+        }
     }
-    function closeCheckinModal() { document.getElementById('checkinModal').classList.remove('show'); }
 </script>
-
 {% endblock %}

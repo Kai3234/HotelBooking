@@ -1,3 +1,4 @@
+import calendar
 from datetime import datetime, timedelta
 
 from flask import request, jsonify
@@ -13,82 +14,125 @@ def get_admin_stats():
     conn = get_db()
     cursor = conn.cursor()
 
-    # Lấy thời gian hiện tại
-    today = datetime.now().strftime('%Y-%m-%d')
-    first_day_month = datetime.now().replace(day=1).strftime('%Y-%m-%d')
+    # Lấy tháng năm từ tham số truyền vào
+    now = datetime.now()
+    selected_month = int(request.args.get('month', now.month))
+    selected_year = int(request.args.get('year', now.year))
+    month_str = f"{selected_year}-{selected_month:02d}"
 
-    # 1. Doanh thu tháng hiện tại (DATPHONG)
-    cursor.execute("""
-        SELECT SUM(TongTien) FROM DATPHONG 
-        WHERE NgayTao >= ? AND TrangThai != 'Đã hủy'
-    """, (first_day_month,))
-    revenue_month = cursor.fetchone()[0] or 0
+    first_day_selected = f"{selected_year}-{selected_month:02d}-01"
+    # --- NHÓM 1: THỐNG KÊ CHUNG (HIỂN THỊ TRÊN BỘ LỌC) ---
 
-    # 2. Tổng đơn đặt trong tháng
-    cursor.execute("SELECT COUNT(MaDP) FROM DATPHONG WHERE NgayTao >= ?", (first_day_month,))
-    total_bookings = cursor.fetchone()[0] or 0
+    # 1. Tổng doanh thu (Tất cả đơn không hủy từ trước đến nay)
+    cursor.execute("SELECT SUM(TongTien) FROM DATPHONG WHERE TrangThai != 'Đã hủy'")
+    revenue_all = cursor.fetchone()[0] or 0
 
-    # 3. Đơn chờ xác nhận
-    cursor.execute("SELECT COUNT(MaDP) FROM DATPHONG WHERE TrangThai = 'Chờ xác nhận'")
-    pending_confirm = cursor.fetchone()[0] or 0
-
-    # 4. Khách đang lưu trú (Trạng thái đơn)
-    cursor.execute("SELECT COUNT(MaDP) FROM DATPHONG WHERE TrangThai = 'Đang lưu trú'")
-    staying_guests = cursor.fetchone()[0] or 0
-
-    # 5. Phòng sẵn sàng (PHONG)
+    # 2. Số phòng sẵn sàng (Hiện tại)
     cursor.execute("SELECT COUNT(MaPhong) FROM PHONG WHERE TrangThai = 'Sẵn sàng'")
     available_rooms = cursor.fetchone()[0] or 0
 
-    # 6. Phòng đang bảo trì
+    # 3. Số phòng bảo trì (Hiện tại)
     cursor.execute("SELECT COUNT(MaPhong) FROM PHONG WHERE TrangThai = 'Bảo trì'")
     maintenance_rooms = cursor.fetchone()[0] or 0
 
-    # 7. Tổng số khách hàng (KHACHHANG)
-    cursor.execute("SELECT COUNT(MaKH) FROM KHACHHANG")
-    total_customers = cursor.fetchone()[0] or 0
+    # 4. Tổng số đơn đặt (Tất cả thời gian)
+    cursor.execute("SELECT COUNT(MaDP) FROM DATPHONG")
+    total_bookings_all = cursor.fetchone()[0] or 0
 
-    # 8. Yêu cầu dịch vụ chờ xử lý (DATPHONG_DICHVU)
-    cursor.execute("SELECT COUNT(MaPDV) FROM DATPHONG_DICHVU WHERE TrangThai = 'Chờ xử lý'")
-    pending_services = cursor.fetchone()[0] or 0
+    # --- NHÓM 2: THỐNG KÊ THEO THÁNG (HIỂN THỊ DƯỚI BỘ LỌC) ---
 
-    # DỮ LIỆU BIỂU ĐỒ: Doanh thu 7 ngày gần nhất
+    # 5. Doanh thu tháng chọn
+    cursor.execute("""
+            SELECT SUM(TongTien) FROM DATPHONG 
+            WHERE strftime('%Y-%m', NgayTao) = ? AND TrangThai != 'Đã hủy'
+        """, (month_str,))
+    revenue_month = cursor.fetchone()[0] or 0
+
+    # 6. Tổng số đơn đặt trong tháng chọn
+    cursor.execute("SELECT COUNT(MaDP) FROM DATPHONG WHERE strftime('%Y-%m', NgayTao) = ?", (month_str,))
+    bookings_month = cursor.fetchone()[0] or 0
+
+    # 7. Tổng số đơn hủy trong tháng chọn
+    cursor.execute("""
+            SELECT COUNT(MaDP) FROM DATPHONG 
+            WHERE strftime('%Y-%m', NgayTao) = ? AND TrangThai = 'Đã hủy'
+        """, (month_str,))
+    canceled_month = cursor.fetchone()[0] or 0
+
+    # 8. Tổng số khách đặt trong tháng (Đếm MaKH duy nhất)
+    cursor.execute("""
+            SELECT COUNT(DISTINCT MaKH) FROM DATPHONG 
+            WHERE strftime('%Y-%m', NgayTao) = ?
+        """, (month_str,))
+    customers_month = cursor.fetchone()[0] or 0
+
+    # DỮ LIỆU BIỂU ĐỒ: Doanh thu tháng chọn
     chart_data = []
     chart_labels = []
-    for i in range(6, -1, -1):
-        day = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
+    # Lấy số ngày trong tháng được chọn (ví dụ: tháng 2 có 28 hoặc 29 ngày)
+    num_days = calendar.monthrange(selected_year, selected_month)[1]
+
+    for day in range(1, num_days + 1):
+        date_str = f"{selected_year}-{selected_month:02d}-{day:02d}"
         cursor.execute("""
-            SELECT SUM(TongTien) FROM DATPHONG 
-            WHERE date(NgayTao) = ? AND TrangThai != 'Đã hủy'
-        """, (day,))
-        row = cursor.fetchone()  # PHẢI CÓ ()
-        val = row[0] if row and row[0] else 0
+                SELECT SUM(TongTien) FROM DATPHONG 
+                WHERE date(NgayTao) = ? AND TrangThai != 'Đã hủy'
+            """, (date_str,))
+        val = cursor.fetchone()[0] or 0
         chart_data.append(val)
-        # Chuyển định dạng ngày để hiển thị (ví dụ 03/04)
-        chart_labels.append((datetime.now() - timedelta(days=i)).strftime('%d/%m'))
+        chart_labels.append(f"{day:02d}/{selected_month:02d}")
 
     conn.close()
 
     return jsonify({
         "status": "success",
         "data": {
-            "widget": {
+            "general": {
+                "revenue_all": revenue_all,
+                "available": available_rooms,
+                "maintenance": maintenance_rooms,
+                "bookings_all": total_bookings_all
+            },
+            "monthly": {
                 "revenue_month": revenue_month,
-                "total_bookings": total_bookings,
-                "pending_confirm": pending_confirm,
-                "staying_guests": staying_guests,
-                "available_rooms": available_rooms,
-                "maintenance_rooms": maintenance_rooms,
-                "total_customers": total_customers,
-                "pending_services": pending_services
+                "bookings_month": bookings_month,
+                "canceled_month": canceled_month,
+                "customers_month": customers_month
             },
             "chart": {
                 "labels": chart_labels,
-                "values": chart_data
+                "values": chart_data,
+                "selected_month": selected_month,
+                "selected_year": selected_year
             }
         }
     })
 
+
+@app.route('/api/rec/admin/years-range', methods=['GET'])
+def get_years_range():
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Lấy năm nhỏ nhất và lớn nhất từ bảng DATPHONG
+    cursor.execute("SELECT MIN(strftime('%Y', NgayTao)), MAX(strftime('%Y', NgayTao)) FROM DATPHONG")
+    row = cursor.fetchone()
+    conn.close()
+
+    current_year = datetime.now().year
+
+    # Nếu DB trống, mặc định là năm hiện tại
+    min_year = int(row[0]) if row[0] else current_year
+    max_year = int(row[1]) if row[1] else current_year
+
+    # Đảm bảo khoảng năm luôn bao gồm cả năm hiện tại
+    start_year = min(min_year, current_year)
+    end_year = max(max_year, current_year)
+
+    return jsonify({
+        "min_year": start_year,
+        "max_year": end_year
+    })
 # ─────────────────────────────────────────────
 # 🔹 2. QUẢN LÝ PHÒNG (ROOMS)
 # ─────────────────────────────────────────────

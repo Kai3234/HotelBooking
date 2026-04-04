@@ -1,276 +1,234 @@
 {% extends 'layout/base_backend.html' %}
 
 {% block title %}Quản lý Dịch vụ - RedHotel{% endblock %}
-{% block page_title %}Quản lý Yêu cầu Dịch vụ{% endblock %}
+{% block page_title %}Xử lý Yêu cầu Dịch vụ khách hàng{% endblock %}
 
 {% block content %}
-
-<!-- BỔ SUNG CSS CHO TABS VÀ CARD DỊCH VỤ -->
 <style>
-    /* Tabs Navigation */
-    .nav-tabs { display: flex; border-bottom: 2px solid var(--border-color); margin-bottom: 20px; gap: 30px; }
-    .nav-tab { padding: 10px 5px; font-weight: 600; color: var(--text-muted); cursor: pointer; border-bottom: 3px solid transparent; transition: 0.3s; font-size: 15px; }
-    .nav-tab:hover { color: var(--primary-red); }
+    .nav-tabs { display: flex; border-bottom: 2px solid var(--border-color); margin-bottom: 25px; gap: 30px; }
+    .nav-tab { padding: 12px 5px; font-weight: 600; color: var(--text-muted); cursor: pointer; border-bottom: 3px solid transparent; transition: 0.3s; }
     .nav-tab.active { color: var(--primary-red); border-bottom-color: var(--primary-red); }
-    
-    /* Tab Content */
-    .tab-content { display: none; animation: fadeIn 0.3s ease; }
+    .tab-content { display: none; }
     .tab-content.active { display: block; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-    /* Service Grid (Danh mục dịch vụ) */
-    .service-menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
-    .service-menu-card { display: flex; align-items: center; padding: 15px; border: 1px solid var(--border-color); border-radius: 8px; transition: 0.3s; background: var(--white); }
-    .service-menu-card:hover { border-color: var(--primary-red); box-shadow: var(--shadow); }
-    .service-menu-img { width: 70px; height: 70px; border-radius: 8px; object-fit: cover; margin-right: 15px; }
+    /* Style cho Grid Catalog */
+    /* Tăng min-width từ 300px lên 400px để ô rộng rãi hơn */
+.catalog-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 25px;
+}
+
+.service-card {
+    display: flex;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: 0.3s;
+    min-height: 140px; /* Tăng chiều cao tối thiểu */
+}
+
+/* Tăng kích thước ảnh để phù hợp với ô lớn */
+.service-img {
+    width: 140px;
+    height: 100%;
+    object-fit: cover;
+}
+
+.service-info {
+    padding: 18px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+/* Đảm bảo phần footer của card luôn có khoảng cách */
+.service-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end; /* Căn chỉnh sát đáy */
+    margin-top: 10px;
+    border-top: 1px dashed #f1f1f1;
+    padding-top: 10px;
+}
 </style>
-
 <div class="card">
     <!-- TABS MENU -->
     <div class="nav-tabs">
-        <div class="nav-tab active" onclick="switchTab('orders', this)"><i class="fa-solid fa-bell-concierge"></i> Yêu cầu của khách</div>
-        <div class="nav-tab" onclick="switchTab('catalog', this)"><i class="fa-solid fa-book-open"></i> Danh mục Dịch vụ</div>
+        <div class="nav-tab active" onclick="switchTab('orders', this)">
+            <i class="fa-solid fa-list-check"></i> Yêu cầu cần xử lý
+        </div>
+        <div class="nav-tab" onclick="switchTab('catalog', this)">
+            <i class="fa-solid fa-utensils"></i> Thông tin Dịch vụ
+        </div>
     </div>
-
-    <!-- ========================================================= -->
-    <!-- TAB 1: DANH SÁCH YÊU CẦU DỊCH VỤ CỦA KHÁCH -->
-    <!-- ========================================================= -->
+     <!-- ================= TAB 1: YÊU CẦU DỊCH VỤ ================= -->
     <div id="tab-orders" class="tab-content active">
-        
-        <!-- Thanh công cụ -->
-        <div class="toolbar">
-            <div class="search-box">
+        <!-- 1. BỘ LỌC TÌM KIẾM -->
+        <form method="GET" action="{{ url_for('services_manage_rec') }}" class="toolbar" style="background: var(--bg-light); padding: 20px; border-radius: 8px; gap: 15px; flex-wrap: wrap;">
+            <div class="search-box" style="flex: 2; min-width: 250px;">
                 <i class="fa-solid fa-search"></i>
-                <input type="text" placeholder="Tìm theo Số phòng, Tên dịch vụ...">
+                <input type="text" name="search" value="{{ search_query }}" placeholder="Phòng, tên khách, tên dịch vụ...">
             </div>
+
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <label style="font-size: 13px; font-weight: 600;">Từ:</label>
+                <input type="date" name="start_date" value="{{ start_date }}" class="form-control" style="width: 150px;">
+                <label style="font-size: 13px; font-weight: 600;">Đến:</label>
+                <input type="date" name="end_date" value="{{ end_date }}" class="form-control" style="width: 150px;">
+            </div>
+
             <div class="filter-group">
-                <select class="form-control" style="width: 150px;">
-                    <option value="all">Tất cả trạng thái</option>
-                    <option value="cho_xu_ly" selected>Chờ xử lý</option>
-                    <option value="da_phuc_vu">Đã phục vụ</option>
+                <select name="status" class="form-control" style="width: 160px;" onchange="this.form.submit()">
+                    <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Tất cả trạng thái</option>
+                    <option value="Chờ xử lý" {% if status_filter == 'Chờ xử lý' %}selected{% endif %}>⏳ Chờ xử lý</option>
+                    <option value="Đã phục vụ" {% if status_filter == 'Đã phục vụ' %}selected{% endif %}>✅ Đã phục vụ</option>
+                    <option value="Đã hủy" {% if status_filter == 'Đã hủy' %}selected{% endif %}>❌ Đã hủy</option>
                 </select>
-                <button class="btn btn-primary" onclick="openAddServiceModal()"><i class="fa-solid fa-plus"></i> Thêm DV cho phòng</button>
-            </div>
-        </div>
-
-        <!-- Bảng danh sách -->
-        <div class="table-responsive">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Phòng / Khách</th>
-                        <th>Nội dung Dịch vụ</th>
-                        <th>Hẹn Lúc (Nếu có)</th>
-                        <th>Tổng Tiền</th>
-                        <th>Trạng Thái</th>
-                        <th>Hành Động</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- ITEM 1: Cần phục vụ ngay -->
-                    <tr>
-                        <td>
-                            <span style="color: var(--primary-red); font-size: 16px; font-weight: bold;">Phòng 201</span><br>
-                            <small style="color: gray;">Lê Văn Khách</small>
-                        </td>
-                        <td>
-                            <strong>Giường Phụ (Extra Bed)</strong><br>
-                            <small>SL: 1 | Đơn giá: 250k</small>
-                        </td>
-                        <td><span style="color: gray;">-- Không --</span></td>
-                        <td style="font-weight: bold;">250,000đ</td>
-                        <td><span class="badge badge-warning">Chờ xử lý</span></td>
-                        <td>
-                            <!-- Team Backend: Tạo route /update_service_status/<id> -->
-                            <form action="#" method="POST" style="display:inline;">
-                                <button type="submit" class="btn-sm btn-success"><i class="fa-solid fa-check"></i> Đã phục vụ</button>
-                            </form>
-                            <button class="btn-sm btn-danger" title="Hủy bỏ yêu cầu"><i class="fa-solid fa-xmark"></i></button>
-                        </td>
-                    </tr>
-
-                    <!-- ITEM 2: Khách hẹn giờ -->
-                    <tr>
-                        <td>
-                            <span style="color: var(--primary-red); font-size: 16px; font-weight: bold;">Phòng 301</span><br>
-                            <small style="color: gray;">Trần Thị B</small>
-                        </td>
-                        <td>
-                            <strong>Xe đưa đón Sân Bay</strong><br>
-                            <small>SL: 1 | Đơn giá: 300k</small>
-                        </td>
-                        <td>
-                            <span style="font-weight: 600; color: #009EF7;">04/04/2026</span><br>
-                            <small style="font-weight: bold; color: var(--text-dark);">14:00 PM</small>
-                        </td>
-                        <td style="font-weight: bold;">300,000đ</td>
-                        <td><span class="badge badge-warning">Chờ xử lý</span></td>
-                        <td>
-                            <button class="btn-sm btn-success"><i class="fa-solid fa-check"></i> Đã phục vụ</button>
-                        </td>
-                    </tr>
-
-                    <!-- ITEM 3: Đã phục vụ xong -->
-                    <tr>
-                        <td>
-                            <span style="font-size: 16px; font-weight: bold; color: var(--text-dark);">Phòng 102</span><br>
-                            <small style="color: gray;">Lý Mạc Sầu</small>
-                        </td>
-                        <td>
-                            <strong>Buffet Sáng</strong><br>
-                            <small>SL: 2 | Đơn giá: 150k</small>
-                        </td>
-                        <td><span style="color: gray;">-- Không --</span></td>
-                        <td style="font-weight: bold;">300,000đ</td>
-                        <td><span class="badge badge-success" style="background-color: #E1F0FF; color: #009EF7;">Đã phục vụ</span></td>
-                        <td>
-                            <button class="btn-sm btn-outline" disabled style="opacity: 0.5;">Hoàn tất</button>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- ========================================================= -->
-    <!-- TAB 2: DANH MỤC DỊCH VỤ (CATALOG) -->
-    <!-- ========================================================= -->
-    <div id="tab-catalog" class="tab-content">
-        <div style="margin-bottom: 20px;">
-            <p style="color: var(--text-muted);">Danh sách các dịch vụ khách sạn đang cung cấp. Nhấn <strong>"Thêm cho phòng"</strong> khi khách gọi điện xuống quầy lễ tân.</p>
-        </div>
-
-        <div class="service-menu-grid">
-            <!-- Dịch vụ 1 -->
-            <div class="service-menu-card">
-                <img src="https://images.unsplash.com/photo-1495474472200-5670b884d3d8?w=150" class="service-menu-img" alt="Buffet">
-                <div style="flex: 1;">
-                    <h4 style="font-size: 15px; margin-bottom: 5px;">Buffet Sáng Tiêu Chuẩn</h4>
-                    <p style="color: var(--primary-red); font-weight: bold; font-size: 14px; margin-bottom: 8px;">150,000đ</p>
-                    <button class="btn-sm btn-outline" onclick="openAddServiceModal('1', 'Buffet Sáng Tiêu Chuẩn', 150000)">
-                        <i class="fa-solid fa-cart-plus"></i> Thêm cho phòng
-                    </button>
-                </div>
-            </div>
-
-            <!-- Dịch vụ 2 -->
-            <div class="service-menu-card">
-                <img src="https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?w=150" class="service-menu-img" alt="Xe">
-                <div style="flex: 1;">
-                    <h4 style="font-size: 15px; margin-bottom: 5px;">Xe đưa đón Sân Bay</h4>
-                    <p style="color: var(--primary-red); font-weight: bold; font-size: 14px; margin-bottom: 8px;">300,000đ</p>
-                    <button class="btn-sm btn-outline" onclick="openAddServiceModal('2', 'Xe đưa đón Sân Bay', 300000)">
-                        <i class="fa-solid fa-cart-plus"></i> Thêm cho phòng
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Dịch vụ 3 -->
-            <div class="service-menu-card">
-                <img src="https://images.unsplash.com/photo-1505693314120-0d443867891c?w=150" class="service-menu-img" alt="Bed">
-                <div style="flex: 1;">
-                    <h4 style="font-size: 15px; margin-bottom: 5px;">Thêm Giường Phụ</h4>
-                    <p style="color: var(--primary-red); font-weight: bold; font-size: 14px; margin-bottom: 8px;">250,000đ</p>
-                    <button class="btn-sm btn-outline" onclick="openAddServiceModal('4', 'Thêm Giường Phụ', 250000)">
-                        <i class="fa-solid fa-cart-plus"></i> Thêm cho phòng
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- ========================================================= -->
-<!-- MODAL: THÊM DỊCH VỤ PHÁT SINH CHO PHÒNG ĐANG Ở -->
-<!-- ========================================================= -->
-<div class="modal-overlay" id="addServiceModal">
-    <div class="modal-content" style="width: 500px;">
-        <div class="modal-header">
-            <h3><i class="fa-solid fa-cart-plus" style="color: var(--primary-red);"></i> Thêm Dịch Vụ Vào Hóa Đơn</h3>
-            <button class="btn-close" onclick="closeAddServiceModal()"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-        
-        <!-- Team Backend: Bắt request POST ở route này, xử lý Insert vào DATPHONG_DICHVU -->
-        <form action="#" method="POST">
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Chọn Phòng Đang Ở <span class="required">*</span></label>
-                    <select class="form-control" name="ma_ctdp" required>
-                        <option value="">-- Chọn số phòng gọi dịch vụ --</option>
-                        <!-- Backend: Query các bảng CHITIET_DATPHONG có trạng thái 'Đã nhận' -->
-                        <option value="50">Phòng 201 (Lê Văn Khách)</option>
-                        <option value="51">Phòng 301 (Trần Thị B)</option>
-                        <option value="52">Phòng 102 (Lý Mạc Sầu)</option>
-                    </select>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Tên Dịch Vụ <span class="required">*</span></label>
-                        <select class="form-control" name="ma_dv" id="modal_select_dv" required>
-                            <!-- Backend: Query bảng DICHVU -->
-                            <option value="1">Buffet Sáng Tiêu Chuẩn</option>
-                            <option value="2">Xe đưa đón Sân Bay</option>
-                            <option value="3">Gói Honeymoon</option>
-                            <option value="4">Thêm Giường Phụ</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Số Lượng <span class="required">*</span></label>
-                        <input type="number" class="form-control" name="so_luong" value="1" min="1" required>
-                    </div>
-                </div>
-
-                <!-- Tùy chọn thời gian phục vụ -->
-                <div class="form-group" style="margin-top: 10px; padding-top: 15px; border-top: 1px dashed var(--border-color);">
-                    <label style="color: var(--text-muted);"><i class="fa-regular fa-clock"></i> Hẹn thời gian phục vụ (Để trống nếu phục vụ ngay)</label>
-                    <div class="form-row" style="margin-bottom: 0;">
-                        <input type="date" class="form-control" name="ngay_hen">
-                        <input type="time" class="form-control" name="gio_hen">
-                    </div>
-                </div>
-                
-                <div style="margin-top: 15px; padding: 10px; background: var(--bg-light); border-radius: 6px; display: flex; align-items: center; gap: 10px;">
-                    <input type="checkbox" name="trang_thai_phuc_vu" id="chk_phuc_vu" value="da_phuc_vu" style="width: 16px; height: 16px; accent-color: var(--primary-red);">
-                    <label for="chk_phuc_vu" style="font-weight: 600; cursor: pointer; padding-top: 3px;">Đã giao cho khách (Đánh dấu Đã phục vụ luôn)</label>
-                </div>
-            </div>
-            
-            <div class="modal-footer">
-                <button type="button" class="btn btn-outline" onclick="closeAddServiceModal()">Hủy bỏ</button>
-                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Lưu Dịch Vụ</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-filter"></i> Lọc</button>
+                <a href="{{ url_for('services_manage_rec') }}" class="btn btn-outline"><i class="fa-solid fa-rotate"></i></a>
             </div>
         </form>
+            <!-- 2. BẢNG DANH SÁCH YÊU CẦU -->
+    <div class="table-responsive" style="margin-top: 20px;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Phòng / Khách</th>
+                    <th>Nội dung Dịch vụ</th>
+                    <th>Thời gian yêu cầu</th>
+                    <th>Tổng Tiền</th>
+                    <th>Trạng Thái</th>
+                    <th>Hành Động</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for o in orders %}
+                <tr>
+                    <td>
+                        <span style="color: var(--primary-red); font-size: 15px; font-weight: bold;">
+                            {% if o.SoPhong %}Phòng {{ o.SoPhong }}{% else %}Chưa gán phòng{% endif %}
+                        </span><br>
+                        <small style="color: gray;">{{ o.HoTen }}</small>
+                    </td>
+                    <td>
+                        <strong>{{ o.TenDV }}</strong>
+                        {% if o.CatalogStatus == 'Đang khóa' %}
+                            <span class="badge badge-danger" style="font-size: 9px; padding: 2px 5px;">DV đã bị khóa</span>
+                        {% endif %}
+                        <br>
+                        <small>SL: {{ o.SoLuong }} | Đơn giá: {{ "{:,.0f}".format(o.DonGia) }}đ</small>
+                    </td>
+                    <td>
+                        <span style="font-weight: 500;">{{ o.Ngay }}</span><br>
+                        <small style="color: #009EF7;">{{ o.Gio }}</small>
+                    </td>
+                    <td style="font-weight: bold; color: var(--text-dark);">
+                        {{ "{:,.0f}".format(o.DonGia * o.SoLuong) }}đ
+                    </td>
+                    <td>
+                        {% if o.OrderStatus == 'Chờ xử lý' %}
+                            <span class="badge badge-warning">Chờ xử lý</span>
+                        {% elif o.OrderStatus == 'Đã phục vụ' %}
+                            <span class="badge badge-success" style="background:#E8FFF3; color:#50CD89;">Đã phục vụ</span>
+                        {% else %}
+                            <span class="badge badge-secondary">Đã hủy</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if o.OrderStatus == 'Chờ xử lý' %}
+                            <div style="display: flex; gap: 5px;">
+                                <!-- Chỉ cho phép phục vụ nếu dịch vụ không bị khóa -->
+                                {% if o.CatalogStatus == 'Đang có' %}
+                                    <a href="{{ url_for('update_service_order', ma_pdv=o.MaPDV, status='served') }}"
+                                       class="btn-sm btn-success" title="Xác nhận đã giao">
+                                        <i class="fa-solid fa-check"></i> Phục vụ
+                                    </a>
+                                {% else %}
+                                    <button class="btn-sm btn-outline" disabled title="Dịch vụ hiện đang bị khóa">
+                                        <i class="fa-solid fa-lock"></i> Khóa
+                                    </button>
+                                {% endif %}
+
+                                <a href="{{ url_for('update_service_order', ma_pdv=o.MaPDV, status='canceled') }}"
+                                   class="btn-sm btn-danger" onclick="return confirm('Hủy yêu cầu này?')">
+                                    <i class="fa-solid fa-xmark"></i> Hủy
+                                </a>
+                            </div>
+                        {% else %}
+                            <small style="color: var(--text-muted);">Không còn thao tác</small>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                        <i class="fa-solid fa-inbox" style="font-size: 30px; margin-bottom: 10px; opacity: 0.5;"></i><br>
+                        Không tìm thấy yêu cầu dịch vụ nào trong khoảng thời gian này.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    </div>
+
+
+<!-- ================= TAB 2: THÔNG TIN DỊCH VỤ ================= -->
+    <div id="tab-catalog" class="tab-content">
+        <div class="catalog-grid">
+            {% for s in catalog %}
+            <div class="service-card" style="{% if s.TrangThai == 'Đang khóa' %}opacity: 0.7; background: #fcfcfc;{% endif %}">
+                <!-- XỬ LÝ HÌNH ẢNH -->
+                <img src="{{ url_for('static', filename=s.HinhAnh) }}" class="service-img" alt="{{ s.TenDV }}">
+
+                <div class="service-info">
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
+                            <h4 style="margin: 0; font-size: 17px; color: var(--text-dark);">{{ s.TenDV }}</h4>
+                            {% if s.TrangThai == 'Đang có' %}
+                                <span class="badge badge-success" style="font-size: 10px; white-space: nowrap;">Hoạt động</span>
+                            {% else %}
+                                <span class="badge badge-danger" style="font-size: 10px; white-space: nowrap;">Đang khóa</span>
+                            {% endif %}
+                        </div>
+                        <p style="font-size: 13px; color: #666; margin: 8px 0; line-height: 1.4;">{{ s.MoTa }}</p>
+                    </div>
+
+                    <!-- PHẦN FOOTER CARD ĐÃ CHỈNH SỬA -->
+                    <div class="service-footer">
+                        <div style="display: flex; flex-direction: column;">
+                            <span style="color: var(--primary-red); font-weight: 800; font-size: 18px;">
+                                {{ "{:,.0f}".format(s.GiaTien) }}₫<small style="font-size: 12px; font-weight: 600;">{% if s.TinhTheoNgay %}/ngày{% endif %}</small>
+                            </span>
+                        </div>
+
+                        <div style="text-align: right;">
+                            <small style="color: #888; font-size: 12px; display: block; margin-bottom: 2px;">
+                                <i class="fa-solid fa-boxes-stacked"></i> Đặc điểm:
+                            </small>
+                            <span style="font-size: 12px; font-weight: 600; color: #555;">
+                                {% if s.ThayDoiSL %}Số lượng linh hoạt{% else %}Số lượng cố định (1){% endif %}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
     </div>
 </div>
 
-<!-- ================= SCRIPT ĐIỀU KHIỂN GIAO DIỆN ================= -->
 <script>
-    // Xử lý chuyển đổi Tabs
-    function switchTab(tabId, element) {
-        // Xóa class active ở tất cả thẻ Tab
+    function switchTab(tabId, el) {
         document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-        // Ẩn tất cả nội dung
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        
-        // Kích hoạt tab được click
-        element.classList.add('active');
+        el.classList.add('active');
         document.getElementById('tab-' + tabId).classList.add('active');
     }
-
-    // Xử lý đóng/mở Modal Thêm Dịch Vụ
-    function openAddServiceModal(maDv = '', tenDv = '', giaDv = 0) {
-        document.getElementById('addServiceModal').classList.add('show');
-        
-        // Nếu người dùng click "Thêm cho phòng" từ Tab Catalog, tự động chọn sẵn Dịch vụ đó trong dropdown
-        if(maDv) {
-            document.getElementById('modal_select_dv').value = maDv;
-        }
-    }
-
-    function closeAddServiceModal() {
-        document.getElementById('addServiceModal').classList.remove('show');
-    }
 </script>
-
 {% endblock %}
+

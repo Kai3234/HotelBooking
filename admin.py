@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import requests
 import uuid
 
@@ -80,15 +82,38 @@ def require_admin(f):
 # 🔹 DASHBOARD ADMIN
 # ─────────────────────────────────────────────
 @app.route('/dashboard_admin')
-@require_admin  # Đảm bảo bạn đã định nghĩa decorator này
+@require_admin
 def dashboard_admin():
-    # Gọi API đã viết ở trên
-    res = call_api('/admin/stats')
-    stats = res.get('data') if res else {}
+    # 1. Lấy tháng/năm hiện tại từ URL
+    month = request.args.get('month', datetime.now().month)
+    year = request.args.get('year', datetime.now().year)
 
-    # stats bây giờ sẽ có 2 phần: stats['widget'] và stats['chart']
-    return render_template('admin/dashboard_admin.html', stats=stats)
+    # 2. Gọi API lấy khoảng năm để làm dropdown
+    res_years = call_api('/admin/years-range')
+    if res_years:
+        start = res_years['min_year']
+        end = res_years['max_year']
+        # Tạo danh sách năm từ nhỏ nhất đến lớn nhất
+        years_list = list(range(start, end + 1))
+    else:
+        years_list = [datetime.now().year]
 
+    # 3. Gọi API lấy thông số dashboard (Đã viết ở các bước trước)
+    res_stats = call_api(f'/admin/stats?month={month}&year={year}')
+
+    # Xử lý dữ liệu stats mặc định nếu lỗi (Tránh lỗi UndefinedError)
+    default_stats = {
+        'widget': {'revenue_month': 0, 'total_bookings': 0, 'pending_confirm': 0, 'staying_guests': 0,
+                   'available_rooms': 0, 'maintenance_rooms': 0, 'locked_rooms': 0, 'pending_services': 0},
+        'chart': {'labels': [], 'values': []}
+    }
+    stats = res_stats.get('data') if res_stats and res_stats.get('status') == 'success' else default_stats
+
+    return render_template('admin/dashboard_admin.html',
+                           stats=stats,
+                           current_month=int(month),
+                           current_year=int(year),
+                           years_list=years_list)  # Truyền danh sách năm xuống
 
 
 # ─────────────────────────────────────────────

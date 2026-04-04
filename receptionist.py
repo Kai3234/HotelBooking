@@ -7,9 +7,40 @@ from main import app
 
 API_BASE_URL = 'http://127.0.0.1:5000/api/rec'
 
+
 @app.route('/dashboard_rec')
 def dashboard_rec():
-    return render_template('receptionist/dashboard_rec.html')
+    # 1. Lấy tham số từ trình duyệt
+    month = request.args.get('month', datetime.now().month, type=int)
+    year = request.args.get('year', datetime.now().year, type=int)
+
+    # 2. Gọi API lấy năm (Sử dụng trực tiếp requests.get)
+    try:
+        res_y = requests.get(f"{API_BASE_URL}/years-range-rec")
+        data_y = res_y.json()
+        years_list = list(range(data_y['min_year'], data_y['max_year'] + 1))
+    except:
+        years_list = [datetime.now().year]
+
+    # 3. Gọi API lấy thống kê (Sử dụng trực tiếp requests.get)
+    try:
+        res_s = requests.get(f"{API_BASE_URL}/stats", params={'month': month, 'year': year})
+        stats = res_s.json()
+    except:
+        # Fallback dữ liệu trống nếu API sập
+        stats = {
+            "general": {"occupied": 0, "available": 0, "ci_today": 0, "co_today": 0},
+            "monthly": {"staying": 0, "ci": 0, "co": 0},
+            "chart": {"labels": [], "ci": [], "co": [], "stay": []}
+        }
+
+    return render_template('receptionist/dashboard_rec.html',
+                           stats=stats,
+                           current_month=month,
+                           current_year=year,
+                           years_list=years_list)
+
+# Kt dashboard_rec
 
 # rooms_layout_rec
 def get_ui_assets(status_data):
@@ -35,6 +66,7 @@ def get_ui_assets(status_data):
     return "status-available", "fa-door-open", "Phòng trống"
 
 
+# rooms_layout_rec
 @app.route('/rooms_layout_rec', methods=['GET'])
 def rooms_layout_rec():
     # 1. Lấy tham số từ URL người dùng gửi lên Client
@@ -104,7 +136,7 @@ def rooms_layout_rec():
                            checkout_date=checkout_str,
                            ma_loai_filter=ma_loai_filter)
 
-
+# ket thuc rooms_layout_rec
 
 # rooms_assign_rec
 @app.route('/rooms_assign_rec', methods=['GET'])
@@ -142,14 +174,6 @@ def assign_room():
     return redirect(url_for('rooms_assign_rec'))
 
 
-@app.route('/checkin/<int:ma_ctdp>')
-def checkin(ma_ctdp):
-    # Gọi API thực hiện checkin
-    requests.post(f"{API_BASE_URL}/checkin/{ma_ctdp}")
-    flash("Khách đã nhận phòng!", "success")
-    return redirect(url_for('rooms_assign_rec'))
-
-
 @app.route('/unassign_room/<int:ma_ctdp>')
 def unassign_room(ma_ctdp):
     # Gọi sang API Server để thực hiện xóa số phòng gán
@@ -165,18 +189,104 @@ def unassign_room(ma_ctdp):
     return redirect(url_for('rooms_assign_rec'))
 # End rooms_assign_rec
 
+# checkin_rec
 @app.route('/checkin_rec')
 def checkin_rec():
-    return render_template('receptionist/checkin_rec.html')
+    search = request.args.get('search', '')
+    status_filter = request.args.get('status_filter', 'all')  # Lấy từ request
 
+    # Gửi tham số lọc sang API
+    res = requests.get(f"{API_BASE_URL}/checkin-list", params={
+        'search': search,
+        'status_filter': status_filter
+    })
+
+    bookings = res.json() if res.status_code == 200 else []
+    today = date.today().isoformat()
+
+    return render_template('receptionist/checkin_rec.html',
+                           bookings=bookings,
+                           search_query=search,
+                           status_filter=status_filter,  # Truyền lại sang HTML để giữ trạng thái select
+                           today=today)
+
+
+@app.route('/confirm_checkin_detail/<int:ma_ctdp>')
+def confirm_checkin_detail(ma_ctdp):
+    requests.post(f"{API_BASE_URL}/checkin-detail/{ma_ctdp}")
+    flash("Đã thực hiện nhận phòng thành công!", "success")
+    return redirect(url_for('checkin_rec'))
+
+
+# Xác nhận đơn (Chuyển từ Chờ xác nhận -> Đã xác nhận)
+@app.route('/confirm_booking_rec/<ma_dp>')
+def confirm_booking_rec(ma_dp):
+    requests.post(f"{API_BASE_URL}/update-booking-status",
+                  json={'ma_dp': ma_dp, 'status': 'Đã xác nhận'})
+    flash(f"Đã xác nhận đơn #{ma_dp}!", "success")
+    return redirect(url_for('checkin_rec'))
+
+# Route hủy đơn
+@app.route('/cancel_booking/<ma_dp>')
+def cancel_booking(ma_dp):
+    requests.post(f"{API_BASE_URL}/update-booking-status",
+                  json={'ma_dp': ma_dp, 'status': 'Đã hủy'})
+    flash(f"Đã hủy đơn #{ma_dp}!", "warning")
+    return redirect(url_for('checkin_rec'))
+
+# Kt checkin_rec
+
+# checkout_rec
 @app.route('/checkout_rec')
 def checkout_rec():
     return render_template('receptionist/checkout_rec.html')
 
+
+# Kt Checkout_rec
+
+
+# services_manage_rec
 @app.route('/services_manage_rec')
 def services_manage_rec():
-    return render_template('receptionist/services_manage_rec.html')
+    status = request.args.get('status', 'all')
+    start_date = request.args.get('start_date', '')
+    end_date = request.args.get('end_date', '')
+    search = request.args.get('search', '')
 
+    # 1. Gọi API lấy các yêu cầu (Orders)
+    params = {'status': status, 'start_date': start_date, 'end_date': end_date, 'search': search}
+    res_orders = requests.get(f"{API_BASE_URL}/service-orders", params=params)
+    orders = res_orders.json() if res_orders.status_code == 200 else []
+
+    # 2. Gọi API lấy danh mục dịch vụ (Catalog)
+    res_catalog = requests.get(f"{API_BASE_URL}/service-catalog")
+    catalog = res_catalog.json() if res_catalog.status_code == 200 else []
+
+    return render_template('receptionist/services_manage_rec.html',
+                           orders=orders,
+                           catalog=catalog,
+                           status_filter=status,
+                           start_date=start_date,
+                           end_date=end_date,
+                           search_query=search)
+
+
+@app.route('/update_service_order/<int:ma_pdv>/<status>')
+def update_service_order(ma_pdv, status):
+    # Mapping status từ URL sang tiếng Việt chuẩn DB
+    status_map = {'served': 'Đã phục vụ', 'canceled': 'Đã hủy'}
+    new_status = status_map.get(status)
+
+    if new_status:
+        requests.post(f"{API_BASE_URL}/update-service-status", json={
+            'ma_pdv': ma_pdv,
+            'status': new_status
+        })
+        flash(f"Đã cập nhật trạng thái: {new_status}", "success")
+
+    return redirect(url_for('services_manage_rec'))
+
+# Kt services_manage_rec
 
 # customer_list_rec
 

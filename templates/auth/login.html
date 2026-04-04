@@ -21,10 +21,10 @@
         </div>
 
         <!-- Vùng hiển thị thông báo Flash (Nếu sai mật khẩu) -->
-        {% if error_message %}
+        {% if message %}
             <div class="alert alert-danger d-flex align-items-center">
                 <i class="fa-solid fa-circle-exclamation me-2"></i>
-                {{ error_message }}
+                {{ message }}
             </div>
         {% endif %}
 
