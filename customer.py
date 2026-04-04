@@ -199,6 +199,24 @@ def add_to_cart():
         if (co_date - ci_date).days < 1:
             flash("Lỗi: Ngày trả phòng phải sau ngày nhận phòng ít nhất 1 ngày!", "danger")
             return redirect(request.referrer or url_for('rooms_list'))
+
+        try:
+            # Gọi API search để kiểm tra xem với ngày này thì MaLoai này còn phòng thực tế không
+            params = {
+                'room_type': ma_loai,
+                'checkin': ci_date.strftime('%d/%m/%Y'),
+                'checkout': co_date.strftime('%d/%m/%Y')
+            }
+            check_res = requests.get(f"{BASE_URL}/api/search_rooms", params=params, timeout=5)
+            if check_res.status_code == 200:
+                data = check_res.json().get('data', [])
+                # Nếu mảng data rỗng tức là loại phòng này đã hết phòng trống (theo logic SQL ở api.py)
+                if not any(str(r['MaLoai']) == str(ma_loai) for r in data):
+                    flash("Rất tiếc, loại phòng này đã hết phòng trống trong khoảng thời gian bạn chọn!", "danger")
+                    return redirect(request.referrer or url_for('rooms_list'))
+        except Exception as e:
+            print(f"Lỗi check trống: {e}")
+
     except Exception:
         flash("Lỗi định dạng ngày không hợp lệ!", "danger")
         return redirect(request.referrer or url_for('rooms_list'))
