@@ -4,17 +4,14 @@
 {% block page_title %}Trả phòng & Thanh toán{% endblock %}
 
 {% block content %}
-<!-- 1. THANH CÔNG CỤ -->
+<!-- THANH CÔNG CỤ -->
 <div class="card" style="margin-bottom: 20px; padding: 15px 25px;">
-    <form method="GET" action="{{ url_for('checkout_rec') }}" class="toolbar" style="margin-bottom: 0; gap: 15px; display: flex; flex-wrap: wrap;">
-
-        <!-- Ô tìm kiếm -->
+    <form method="GET" action="{{ url_for('checkout_rec') }}" class="toolbar" style="gap: 15px; display: flex; flex-wrap: wrap;">
         <div class="search-box" style="width: 250px;">
             <i class="fa-solid fa-search"></i>
             <input type="text" name="search" value="{{ search_query }}" placeholder="Mã đơn, Tên khách...">
         </div>
 
-        <!-- Lọc trạng thái đặt phòng -->
         <div class="filter-group">
             <label style="font-weight: 600; font-size: 13px;">Trạng thái:</label>
             <select name="booking_filter" class="form-control" style="width: 150px;" onchange="this.form.submit()">
@@ -24,7 +21,7 @@
             </select>
         </div>
 
-        <!-- Lọc trạng thái thanh toán -->
+
         <div class="filter-group">
             <label style="font-weight: 600; font-size: 13px;">Thanh toán:</label>
             <select name="pay_filter" class="form-control" style="width: 160px;" onchange="this.form.submit()">
@@ -40,9 +37,11 @@
             <input type="date" name="process_date" value="{{ today }}" class="form-control" style="width: 150px;" onchange="this.form.submit()">
         </div>
 
+
         <div style="display: flex; gap: 5px;">
             <button type="submit" class="btn btn-primary">Lọc</button>
-            <a href="{{ url_for('checkout_rec') }}" class="btn btn-outline" title="Xóa lọc">
+            <!-- Nút Reset Session lọc -->
+            <a href="{{ url_for('checkout_rec_reset') }}" class="btn btn-outline" title="Xóa hết bộ lọc">
                 <i class="fa-solid fa-rotate-left"></i>
             </a>
         </div>
@@ -70,46 +69,43 @@
     </div>
 
     <div class="card-body" style="padding: 0;">
-        <table class="table" style="margin-bottom: 0;">
+        <table class="table">
             <thead class="bg-light">
                 <tr>
-                    <th style="padding-left: 20px;">Thông tin Phòng & Dịch vụ</th>
-                    <th>Thời gian</th>
+                    <th>Chi tiết Phòng/Dịch vụ</th>
+                    <th>Thời gian / SL</th>
                     <th>Đơn giá</th>
-                    <th>Trạng thái</th>
+                    <th>Thành tiền</th>
                     <th>Thao tác</th>
                 </tr>
             </thead>
             <tbody>
                 {% for ct in dp.ChiTiet %}
-                <!-- Dòng PHÒNG -->
-                <tr style="background-color: #fcfcfc; font-weight: bold;">
-                    <td style="padding-left: 20px;">
-                        <i class="fa-solid fa-door-open"></i> P.{{ ct.SoPhong }} - {{ ct.TenLoai }}
-                    </td>
-                    <td>{{ ct.NgayNhan }} ➔ {{ ct.NgayTra }}</td>
-                    <td>{{ "{:,.0f}".format(ct.GiaPhong) }}₫</td>
-                    <td><span class="badge badge-outline">{{ ct.TrangThai }}</span></td>
-                    <td>
-                        {% if ct.TrangThai == 'Đã nhận' and ct.NgayTra == today %}
-                        <a href="{{ url_for('confirm_checkout_detail', ma_ctdp=ct.MaCTDP) }}" class="btn-sm btn-primary">Trả phòng</a>
-                        {% endif %}
-                    </td>
-                </tr>
-
-                <!-- Các dòng DỊCH VỤ của phòng đó -->
-                {% for dv in ct.DichVu %}
-                <tr style="font-size: 13px; color: #555;">
-                    <td style="padding-left: 50px;">
-                        <i class="fa-solid fa-concierge-bell" style="color: #FFA800;"></i>
-                        {{ dv.TenDV }} (x{{ dv.SoLuong }})
-                    </td>
-                    <td>{{ dv.Ngay }}</td>
-                    <td>{{ "{:,.0f}".format(dv.DonGia * dv.SoLuong) }}₫</td>
-                    <td>{{ dv.TrangThai }}</td>
-                    <td></td>
-                </tr>
-                {% endfor %}
+                    <!-- DÒNG PHÒNG -->
+                    <tr style="background-color: #fcfcfc;">
+                        <td>
+                            <b>P.{{ ct.SoPhong }}</b> - {{ ct.TenLoai }}
+                            <br><span class="badge badge-secondary" style="font-size: 9px;">{{ ct.TrangThai }}</span>
+                        </td>
+                        <td>{{ ct.NgayNhan }} ➔ {{ ct.NgayTra }}<br><b>{{ ct.SoNgayO }} ngày</b></td>
+                        <td>{{ "{:,.0f}".format(ct.GiaPhong) }}₫</td>
+                        <td><b style="color: var(--primary-red);">{{ "{:,.0f}".format(ct.ThanhTienPhong) }}₫</b></td>
+                        <td>
+                            {% if ct.TrangThai == 'Đã nhận' and ct.NgayTra == today %}
+                                <a href="{{ url_for('confirm_checkout_detail', ma_ctdp=ct.MaCTDP) }}" class="btn-sm btn-primary">Trả phòng</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <!-- DÒNG DỊCH VỤ -->
+                    {% for dv in ct.DichVu %}
+                    <tr style="font-size: 13px; color: #666;">
+                        <td style="padding-left: 40px;"><i class="fa-solid fa-concierge-bell"></i> {{ dv.TenDV }}</td>
+                        <td>x{{ dv.SoLuong }}</td>
+                        <td>{{ "{:,.0f}".format(dv.DonGia) }}₫</td>
+                        <td>{{ "{:,.0f}".format(dv.DonGia * dv.SoLuong) }}₫</td>
+                        <td></td>
+                    </tr>
+                    {% endfor %}
                 {% endfor %}
             </tbody>
         </table>

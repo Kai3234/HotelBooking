@@ -138,8 +138,10 @@ def register():
 
 @app.route('/logout')
 def logout():
+    get_flashed_messages()
     session.pop('current_user', None)  # Xóa dict current_user khỏi session
     session.pop('cart', None) # Xóa giỏ hàng
+    session.clear()
     return redirect(url_for('login'))
 
 

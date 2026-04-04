@@ -141,24 +141,51 @@ def rooms_layout_rec():
 # rooms_assign_rec
 @app.route('/rooms_assign_rec', methods=['GET'])
 def rooms_assign_rec():
-    # 1. Lấy param từ URL
-    search = request.args.get('search', '')
-    status = request.args.get('status', 'all')
+    # 1. Danh sách tham số (Thêm ma_loai)
+    keys = ['search', 'status', 'ma_loai']
 
-    # 2. Gọi API lấy danh sách đặt phòng
-    res_bookings = requests.get(f"{API_BASE_URL}/bookings", params={'search': search, 'status': status})
+    for key in keys:
+        if key in request.args:
+            session[f'ra_{key}'] = request.args.get(key)
+        elif f'ra_{key}' not in session:
+            session[f'ra_{key}'] = 'all' if key != 'search' else ''
+
+    search_query = session.get('ra_search')
+    status_filter = session.get('ra_status')
+    ma_loai_filter = session.get('ra_ma_loai')
+
+    # 2. Gọi API lấy danh sách loại phòng cho Dropdown
+    res_types = requests.get(f"{API_BASE_URL}/room-types-rec")
+    room_types = res_types.json() if res_types.status_code == 200 else []
+
+    # 3. Gọi API lấy danh sách đặt phòng kèm bộ lọc ma_loai
+    params = {
+        'search': search_query,
+        'status': status_filter,
+        'ma_loai': ma_loai_filter
+    }
+    res_bookings = requests.get(f"{API_BASE_URL}/bookings", params=params)
     bookings = res_bookings.json() if res_bookings.status_code == 200 else []
 
-    # 3. Gọi API lấy dữ liệu phòng và lịch bận (Dùng cho Modal gán phòng)
+    # 4. Gọi API metadata phòng
     res_meta = requests.get(f"{API_BASE_URL}/rooms-metadata")
     meta_data = res_meta.json() if res_meta.status_code == 200 else {"rooms": [], "booked_intervals": []}
 
     return render_template('receptionist/rooms_assign_rec.html',
                            bookings=bookings,
+                           room_types=room_types,  # Gửi sang HTML
                            all_rooms=meta_data['rooms'],
                            all_booked_intervals=meta_data['booked_intervals'],
-                           search_query=search,
-                           status_filter=status)
+                           search_query=search_query,
+                           status_filter=status_filter,
+                           ma_loai_filter=ma_loai_filter)
+
+
+@app.route('/rooms_assign_rec/reset')
+def rooms_assign_rec_reset():
+    for key in ['ra_search', 'ra_status', 'ra_ma_loai']:
+        session.pop(key, None)
+    return redirect(url_for('rooms_assign_rec'))
 
 
 @app.route('/assign_room', methods=['POST'])
@@ -190,28 +217,59 @@ def unassign_room(ma_ctdp):
 # End rooms_assign_rec
 
 # checkin_rec
-@app.route('/checkin_rec')
+@app.route('/checkin_rec', methods=['GET'])
 def checkin_rec():
-    search = request.args.get('search', '')
-    status_filter = request.args.get('status_filter', 'all')
+    # 1. Danh sách các phím cần lưu trữ trong session
+    keys = ['search', 'status_filter', 'process_date']
 
-    # 1. Lấy ngày xử lý từ URL, mặc định là ngày hôm nay
-    process_date = request.args.get('process_date', date.today().isoformat())
+    # 2. Xử lý đồng bộ giữa URL Params và Session
+    for key in keys:
+        # Nếu người dùng vừa nhấn "Lọc" hoặc "Tìm kiếm" (có giá trị trên URL)
+        if key in request.args:
+            session[f'ci_{key}'] = request.args.get(key)
+        # Nếu không có trên URL nhưng trong session đã có (do lần lọc trước đó)
+        elif f'ci_{key}' not in session:
+            # Gán giá trị mặc định cho lần đầu tiên truy cập
+            if key == 'process_date':
+                session[f'ci_{key}'] = date.today().isoformat()
+            elif key == 'search':
+                session[f'ci_{key}'] = ''
+            else:
+                session[f'ci_{key}'] = 'all'
 
-    # Gửi tham số lọc sang API
-    res = requests.get(f"{API_BASE_URL}/checkin-list", params={
+    # 3. Lấy giá trị thực tế từ session để thực hiện gọi API
+    search = session.get('ci_search')
+    status_filter = session.get('ci_status_filter')
+    today = session.get('ci_process_date')
+
+    # 4. Gọi API lấy danh sách với các tham số từ session
+    params = {
         'search': search,
         'status_filter': status_filter
-    })
+    }
 
-    bookings = res.json() if res.status_code == 200 else []
+    try:
+        res = requests.get(f"{API_BASE_URL}/checkin-list", params=params)
+        bookings = res.json() if res.status_code == 200 else []
+    except:
+        bookings = []
 
-    # 2. Truyền process_date vào biến today của template
+    # 5. Render template và truyền lại các giá trị để hiển thị trên input/select
     return render_template('receptionist/checkin_rec.html',
                            bookings=bookings,
                            search_query=search,
                            status_filter=status_filter,
-                           today=process_date)  # Biến today trong HTML sẽ là ngày được chọn
+                           today=today)
+
+
+# 6. Route Reset để xóa bộ lọc
+@app.route('/checkin_rec/reset')
+def checkin_rec_reset():
+    # Xóa các biến liên quan đến trang checkin trong session
+    session.pop('ci_search', None)
+    session.pop('ci_status_filter', None)
+    session.pop('ci_process_date', None)
+    return redirect(url_for('checkin_rec'))
 
 
 @app.route('/confirm_checkin_detail/<int:ma_ctdp>')
@@ -240,15 +298,32 @@ def cancel_booking(ma_dp):
 # Kt checkin_rec
 
 # checkout_rec
-@app.route('/checkout_rec')
+@app.route('/checkout_rec', methods=['GET'])
 def checkout_rec():
-    # Lấy tất cả các tham số lọc từ request.args
-    search = request.args.get('search', '')
-    pay_filter = request.args.get('pay_filter', 'all')
-    booking_filter = request.args.get('booking_filter', 'all')
-    process_date = request.args.get('process_date', date.today().isoformat())
+    # 1. Danh sách các tham số cần theo dõi
+    keys = ['search', 'pay_filter', 'booking_filter', 'process_date']
 
-    # Gửi tất cả tham số sang API
+    # 2. Đồng bộ hóa giữa URL và Session
+    for key in keys:
+        # Nếu có trên URL (người dùng vừa nhấn Lọc hoặc đổi trang)
+        if key in request.args:
+            session[f'ck_{key}'] = request.args.get(key)
+        # Nếu không có trên URL nhưng cũng chưa có trong session -> Gán mặc định
+        elif f'ck_{key}' not in session:
+            if key == 'process_date':
+                session[f'ck_{key}'] = date.today().isoformat()
+            elif key == 'search':
+                session[f'ck_{key}'] = ''
+            else:
+                session[f'ck_{key}'] = 'all'
+
+    # 3. Lấy giá trị cuối cùng từ session để làm việc
+    search = session.get('ck_search')
+    pay_filter = session.get('ck_pay_filter')
+    booking_filter = session.get('ck_booking_filter')
+    today = session.get('ck_process_date')
+
+    # 4. Gọi API với các tham số đã lấy từ session
     params = {
         'search': search,
         'pay_filter': pay_filter,
@@ -264,10 +339,17 @@ def checkout_rec():
     return render_template('receptionist/checkout_rec.html',
                            bookings=bookings,
                            search_query=search,
-                           pay_filter=pay_filter,  # Gửi lại để HTML nhận
-                           booking_filter=booking_filter,  # Gửi lại để HTML nhận
-                           today=process_date)
+                           pay_filter=pay_filter,
+                           booking_filter=booking_filter,
+                           today=today)
 
+# Route Reset bộ lọc (Dùng khi muốn xóa hết session lọc)
+@app.route('/checkout_rec/reset')
+def checkout_rec_reset():
+    keys = ['ck_search', 'ck_pay_filter', 'ck_booking_filter', 'ck_process_date']
+    for key in keys:
+        session.pop(key, None)
+    return redirect(url_for('checkout_rec'))
 
 @app.route('/pay_booking/<int:ma_dp>', methods=['POST'])
 def pay_booking(ma_dp):
@@ -325,17 +407,28 @@ def complete_booking(ma_dp):
 # services_manage_rec
 @app.route('/services_manage_rec')
 def services_manage_rec():
-    status = request.args.get('status', 'all')
-    start_date = request.args.get('start_date', '')
-    end_date = request.args.get('end_date', '')
-    search = request.args.get('search', '')
+    # 1. Quản lý lưu trữ bộ lọc vào Session
+    filter_keys = ['status', 'start_date', 'end_date', 'search']
 
-    # 1. Gọi API lấy các yêu cầu (Orders)
+    for key in filter_keys:
+        # Nếu có trên URL (người dùng vừa submit form) -> Lưu vào session
+        if key in request.args:
+            session[f'srv_{key}'] = request.args.get(key)
+        # Nếu không có trên URL nhưng trong session cũng chưa có -> Gán mặc định
+        elif f'srv_{key}' not in session:
+            session[f'srv_{key}'] = 'all' if key == 'status' else ''
+
+    # 2. Lấy giá trị từ session để gửi API
+    status = session.get('srv_status')
+    start_date = session.get('srv_start_date')
+    end_date = session.get('srv_end_date')
+    search = session.get('srv_search')
+
+    # 3. Gọi API
     params = {'status': status, 'start_date': start_date, 'end_date': end_date, 'search': search}
     res_orders = requests.get(f"{API_BASE_URL}/service-orders", params=params)
     orders = res_orders.json() if res_orders.status_code == 200 else []
 
-    # 2. Gọi API lấy danh mục dịch vụ (Catalog)
     res_catalog = requests.get(f"{API_BASE_URL}/service-catalog")
     catalog = res_catalog.json() if res_catalog.status_code == 200 else []
 
@@ -346,6 +439,14 @@ def services_manage_rec():
                            start_date=start_date,
                            end_date=end_date,
                            search_query=search)
+
+
+# Thêm route reset lọc nếu cần
+@app.route('/services_manage_rec/reset')
+def services_manage_rec_reset():
+    for key in ['srv_status', 'srv_start_date', 'srv_end_date', 'srv_search']:
+        session.pop(key, None)
+    return redirect(url_for('services_manage_rec'))
 
 
 @app.route('/update_service_order/<int:ma_pdv>/<status>')

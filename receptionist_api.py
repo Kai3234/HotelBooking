@@ -194,11 +194,12 @@ def get_room_types():
 
 
 # API của room_assign_rec
-# 1. API lấy danh sách đặt phòng kèm bộ lọc
+# API 1: Lấy danh sách đặt phòng (Cập nhật lọc MaLoai)
 @app.route('/api/rec/bookings', methods=['GET'])
 def get_bookings():
     search = request.args.get('search', '')
     status = request.args.get('status', 'all')
+    ma_loai = request.args.get('ma_loai', 'all')  # Thêm tham số này
 
     conn = get_db()
     cursor = conn.cursor()
@@ -214,10 +215,13 @@ def get_bookings():
         WHERE CT.TrangThai NOT IN ('Đã trả', 'Đã hủy')
     """
     params = []
+
+    # Logic tìm kiếm mã/tên
     if search:
         sql += " AND (CT.MaDP LIKE ? OR CT.MaCTDP LIKE ? OR KH.HoTen LIKE ?)"
         params.extend([f'%{search}%', f'%{search}%', f'%{search}%'])
 
+    # Logic lọc trạng thái gán
     if status == 'cho_gan':
         sql += " AND CT.MaPhong IS NULL AND CT.TrangThai = 'Chờ nhận'"
     elif status == 'da_gan':
@@ -225,10 +229,17 @@ def get_bookings():
     elif status == 'dang_o':
         sql += " AND CT.TrangThai = 'Đã nhận'"
 
+    # LOGIC LỌC THEO LOẠI PHÒNG (MỚI)
+    if ma_loai != 'all':
+        sql += " AND LP.MaLoai = ?"
+        params.append(ma_loai)
+
+    sql += " ORDER BY DP.NgayTao DESC"
     cursor.execute(sql, params)
     data = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return jsonify(data)
+
 
 
 # 2. API lấy toàn bộ phòng và các khoảng thời gian đã bận
@@ -328,12 +339,13 @@ def api_update_booking_status():
 # 2. API Danh sách Check-in (Cập nhật logic Gán/Xác nhận)
 @app.route('/api/rec/checkin-list', methods=['GET'])
 def get_checkin_list():
-    search = request.args.get('search', '')
-    status_filter = request.args.get('status_filter', 'all')  # Nhận tham số lọc
+    search = request.args.get('search', '').strip()
+    status_filter = request.args.get('status_filter', 'all')
 
     conn = get_db()
     cursor = conn.cursor()
 
+    # Query cơ bản (Giữ nguyên các JOIN để lấy đủ thông tin)
     sql = """
         SELECT DP.*, KH.HoTen, KH.SDT,
                CT.MaCTDP, CT.MaPhong, CT.MaLoai, CT.NgayNhan, CT.NgayTra, 
@@ -347,39 +359,56 @@ def get_checkin_list():
     """
     params = []
 
-    # 1. Lọc theo tìm kiếm
+    # 1. Cập nhật Logic Tìm kiếm theo 4 tiêu chí: MaDP, MaCTDP, HoTen, TenLoai
     if search:
-        sql += " AND (DP.MaDP LIKE ? OR KH.HoTen LIKE ? OR KH.SDT LIKE ?)"
-        params.extend([f'%{search}%', f'%{search}%', f'%{search}%'])
+        sql += """ AND (
+            DP.MaDP LIKE ? OR 
+            CT.MaCTDP LIKE ? OR 
+            KH.HoTen LIKE ? OR 
+            LP.TenLoai LIKE ?
+        )"""
+        # Tạo chuỗi tìm kiếm đại diện %keyword%
+        search_val = f'%{search}%'
+        # Truyền tham số cho 4 dấu hỏi chấm (?)
+        params.extend([search_val, search_val, search_val, search_val])
 
-    # 2. Lọc theo trạng thái đơn (QUAN TRỌNG)
+    # 2. Lọc theo trạng thái đơn
     if status_filter != 'all':
         sql += " AND DP.TrangThai = ?"
         params.append(status_filter)
-    else:
-        # Nếu để 'all', có thể mặc định ẩn các đơn 'Đã hủy' hoặc hiện hết tùy bạn
-        # Ở đây tôi cho hiện hết theo yêu cầu của bạn
-        pass
 
     sql += " ORDER BY DP.NgayTao DESC"
+
     cursor.execute(sql, params)
     rows = cursor.fetchall()
     conn.close()
 
-    # Gộp dữ liệu theo MaDP (Giữ nguyên logic cũ)
+    # Gộp dữ liệu theo MaDP
     bookings_dict = {}
     for row in rows:
         ma_dp = row['MaDP']
         if ma_dp not in bookings_dict:
             bookings_dict[ma_dp] = dict(row)
             bookings_dict[ma_dp]['ChiTiet'] = []
-        bookings_dict[ma_dp]['ChiTiet'].append(dict(row))
+
+        # Đưa thông tin chi tiết vào mảng con
+        bookings_dict[ma_dp]['ChiTiet'].append({
+            'MaCTDP': row['MaCTDP'],
+            'MaPhong': row['MaPhong'],
+            'SoPhong': row['SoPhong'],
+            'TenLoai': row['TenLoai'],
+            'NgayNhan': row['NgayNhan'],
+            'NgayTra': row['NgayTra'],
+            'TrangThaiCT': row['TrangThaiCT']
+        })
 
     results = list(bookings_dict.values())
     for b in results:
-        # Logic tính toán nút Xác nhận đơn hàng (CanConfirm)
+        # Logic tính toán nút Xác nhận/Check-in
         all_assigned = all(ct['MaPhong'] is not None for ct in b['ChiTiet'])
         b['CanConfirm'] = (b['TrangThai'] == 'Chờ xác nhận' and all_assigned)
+        # Thêm flag này nếu cần xử lý giao diện cho Đã xác nhận
+        b['CanCheckin'] = (b['TrangThai'] == 'Đã xác nhận' and all_assigned)
 
     return jsonify(results)
 
@@ -423,7 +452,9 @@ def get_service_orders():
             PDV.TrangThai as OrderStatus,
             DV.TenDV, DV.TrangThai as CatalogStatus,
             P.SoPhong, KH.HoTen,
-            CT.MaDP, CT.MaCTDP -- Lấy thêm Mã đơn và Mã chi tiết
+            CT.MaDP, CT.MaCTDP,
+            DP.TrangThai as BookingStatus, -- Trạng thái Đơn Đặt
+            CT.TrangThai as DetailStatus   -- Trạng thái Phòng (Chi tiết)
         FROM DATPHONG_DICHVU PDV
         JOIN DICHVU DV ON PDV.MaDV = DV.MaDV
         JOIN CHITIET_DATPHONG CT ON PDV.MaCTDP = CT.MaCTDP
@@ -447,11 +478,12 @@ def get_service_orders():
         params.append(end_date)
 
     if search:
-        # Thêm tìm kiếm theo CT.MaDP và CT.MaCTDP
         sql += " AND (P.SoPhong LIKE ? OR KH.HoTen LIKE ? OR DV.TenDV LIKE ? OR CT.MaDP LIKE ? OR CT.MaCTDP LIKE ?)"
         params.extend([f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%'])
 
-    sql += " ORDER BY PDV.Ngay DESC, PDV.Gio DESC"
+    # SẮP XẾP THEO NGÀY TĂNG DẦN
+    sql += " ORDER BY PDV.Ngay ASC, PDV.Gio ASC"
+
     cursor.execute(sql, params)
     orders = [dict(row) for row in cursor.fetchall()]
     conn.close()
@@ -485,14 +517,12 @@ def update_service_status():
 @app.route('/api/rec/checkout-list', methods=['GET'])
 def get_checkout_list():
     search = request.args.get('search', '')
-    # Thêm 2 tham số lọc mới
-    pay_filter = request.args.get('pay_filter', 'all')      # all, paid, unpaid
-    booking_filter = request.args.get('booking_filter', 'all') # all, Đang lưu trú, Hoàn tất
+    pay_filter = request.args.get('pay_filter', 'all')
+    booking_filter = request.args.get('booking_filter', 'all')
 
     conn = get_db()
     cursor = conn.cursor()
 
-    # Query cơ bản
     sql = """
         SELECT DP.*, KH.HoTen, KH.SDT
         FROM DATPHONG DP
@@ -500,31 +530,26 @@ def get_checkout_list():
         WHERE DP.TrangThai IN ('Đang lưu trú', 'Hoàn tất')
     """
     params = []
-    # 1. Lọc theo tìm kiếm
     if search:
         sql += " AND (DP.MaDP LIKE ? OR KH.HoTen LIKE ?)"
         params.extend([f'%{search}%', f'%{search}%'])
-
-    # 2. Lọc theo Trạng thái Đặt phòng (Staying / Completed)
     if booking_filter != 'all':
         sql += " AND DP.TrangThai = ?"
         params.append(booking_filter)
-
-    # 3. Lọc theo Trạng thái Thanh toán (MaNV IS NULL/NOT NULL)
     if pay_filter == 'paid':
         sql += " AND DP.MaNV IS NOT NULL"
     elif pay_filter == 'unpaid':
         sql += " AND DP.MaNV IS NULL"
 
-    sql += " ORDER BY DP.NgayTao DESC"
-    cursor.execute(sql, params)
-
+    cursor.execute(sql + " ORDER BY DP.NgayTao DESC", params)
     bookings = [dict(row) for row in cursor.fetchall()]
 
     for b in bookings:
-        # 2. Lấy chi tiết phòng và Dịch vụ lồng nhau
+        # Lấy chi tiết phòng và TÍNH SỐ NGÀY Ở (Dùng julianday)
+        # MAX(1, ...) đảm bảo dù khách check-out trong ngày vẫn tính 1 ngày tiền phòng
         cursor.execute("""
-            SELECT CT.*, LP.TenLoai, P.SoPhong 
+            SELECT CT.*, LP.TenLoai, P.SoPhong,
+            CAST(MAX(1, julianday(CT.NgayTra) - julianday(CT.NgayNhan)) AS INTEGER) as SoNgayO
             FROM CHITIET_DATPHONG CT
             JOIN LOAIPHONG LP ON CT.MaLoai = LP.MaLoai
             LEFT JOIN PHONG P ON CT.MaPhong = P.MaPhong
@@ -532,51 +557,37 @@ def get_checkout_list():
         """, (b['MaDP'],))
         chi_tiet_phong = [dict(row) for row in cursor.fetchall()]
 
-        tong_tien_phong = 0
-        tong_tien_dv = 0
-        all_rooms_handled = True  # Tất cả phòng đã Nhận/Trả/Hủy
-        all_rooms_returned = True  # Tất cả phòng đã Trả/Hủy (để Hoàn tất đơn)
-        all_services_handled = True  # Tất cả dịch vụ đã Phục vụ/Hủy
+        total_actual = 0
+        all_returned = True
 
         for ct in chi_tiet_phong:
-            # Lấy dịch vụ của từng phòng
+            # Lấy dịch vụ 'Đã phục vụ'
             cursor.execute("""
-                SELECT DPDV.*, DV.TenDV, DV.TinhTheoNgay 
+                SELECT DPDV.*, DV.TenDV
                 FROM DATPHONG_DICHVU DPDV
                 JOIN DICHVU DV ON DPDV.MaDV = DV.MaDV
-                WHERE DPDV.MaCTDP = ?
+                WHERE DPDV.MaCTDP = ? AND DPDV.TrangThai = 'Đã phục vụ'
             """, (ct['MaCTDP'],))
             ct['DichVu'] = [dict(row) for row in cursor.fetchall()]
 
-            # Kiểm tra trạng thái phòng cho logic Pay/Complete
-            if ct['TrangThai'] == 'Chờ nhận': all_rooms_handled = False
-            if ct['TrangThai'] == 'Đã nhận': all_rooms_returned = False
+            # Tiền phòng = Đơn giá * Số ngày (Chỉ tính cho phòng Đã nhận hoặc Đã trả)
+            if ct['TrangThai'] in ['Đã nhận', 'Đã trả']:
+                ct['ThanhTienPhong'] = ct['GiaPhong'] * ct['SoNgayO']
+                total_actual += ct['ThanhTienPhong']
 
-            # Tính tiền phòng (chỉ tính phòng không bị Hủy)
-            if ct['TrangThai'] != 'Đã hủy':
-                tong_tien_phong += ct['GiaPhong']
+            if ct['TrangThai'] == 'Đã nhận':
+                all_returned = False
 
-            # Kiểm tra trạng thái dịch vụ và tính tiền
-            for dv in ct['DichVu']:
-                if dv['TrangThai'] == 'Chờ xử lý':
-                    all_services_handled = False
-                if dv['TrangThai'] == 'Đã phục vụ':
-                    tong_tien_dv += (dv['DonGia'] * dv['SoLuong'])
+            # Tiền dịch vụ
+            ct['TongTienDV'] = sum(dv['DonGia'] * dv['SoLuong'] for dv in ct['DichVu'])
+            total_actual += ct['TongTienDV']
 
         b['ChiTiet'] = chi_tiet_phong
-        b['TongTienThucTe'] = tong_tien_phong + tong_tien_dv
-
-        # LOGIC ĐIỀU KIỆN
-        # Thanh toán được khi: Đang lưu trú + (Phòng != Chờ nhận) + (Dịch vụ != Chờ xử lý) + Chưa có MaNV
-        b['CanPay'] = (b['TrangThai'] == 'Đang lưu trú' and
-                       all_rooms_handled and
-                       all_services_handled and
-                       b['MaNV'] is None)
-
-        # Hoàn tất được khi: Đang lưu trú + Đã có MaNV + Tất cả phòng đã Trả/Hủy
-        b['CanComplete'] = (b['TrangThai'] == 'Đang lưu trú' and
-                            b['MaNV'] is not None and
-                            all_rooms_returned)
+        b['TongTienThucTe'] = total_actual
+        b['IsPaid'] = b['MaNV'] is not None
+        b['CanPay'] = (b['TrangThai'] == 'Đang lưu trú' and not b['IsPaid'])
+        # Chỉ cho Hoàn tất nếu Đã thanh toán (MaNV != None) và Tất cả phòng đã trả/hủy
+        b['CanComplete'] = (b['TrangThai'] == 'Đang lưu trú' and b['IsPaid'] and all_returned)
 
     conn.close()
     return jsonify(bookings)

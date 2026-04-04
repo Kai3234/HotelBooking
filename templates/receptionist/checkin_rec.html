@@ -12,7 +12,7 @@
         <!-- Ô tìm kiếm -->
         <div class="search-box" style="width: 300px;">
             <i class="fa-solid fa-search"></i>
-            <input type="text" name="search" value="{{ search_query }}" placeholder="Mã đơn, Tên hoặc SĐT...">
+            <input type="text" name="search" value="{{ search_query }}" placeholder="Mã đơn, Mã chi tiết, Tên khách hoặc Tên loại phòng...">
         </div>
 
         <div class="filter-group" style="display: flex; gap: 15px; align-items: center;">
@@ -40,8 +40,8 @@
             <button type="submit" class="btn btn-primary">Lọc</button>
 
             <!-- Nút Reset nhanh về ngày hôm nay -->
-            <a href="{{ url_for('checkin_rec') }}" class="btn btn-outline" title="Về hôm nay">
-                <i class="fa-solid fa-calendar-day"></i>
+            <a href="{{ url_for('checkin_rec_reset') }}" class="btn btn-outline" title="Làm mới bộ lọc">
+                <i class="fa-solid fa-rotate-left"></i>
             </a>
         </div>
     </form>
