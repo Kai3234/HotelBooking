@@ -307,6 +307,18 @@ def api_update_booking_status():
     # Nếu hủy đơn, hủy luôn các chi tiết phòng
     if new_status == 'Đã hủy':
         cursor.execute("UPDATE CHITIET_DATPHONG SET TrangThai = 'Đã hủy' WHERE MaDP = ?", (ma_dp,))
+        cursor.execute("""
+            UPDATE DATPHONG_DICHVU
+            SET TrangThai = 'Đã hủy'
+            WHERE MaCTDP IN (
+                SELECT MaCTDP
+                FROM CHITIET_DATPHONG
+                WHERE MaDP = ?
+            )
+        """, (ma_dp,))
+
+    conn.commit()
+
 
     conn.commit()
     conn.close()
@@ -397,7 +409,6 @@ def api_checkin_detail(ma_ctdp):
 # services_manage_rec
 @app.route('/api/rec/service-orders', methods=['GET'])
 def get_service_orders():
-    # Lấy tham số lọc
     status_filter = request.args.get('status', 'all')
     start_date = request.args.get('start_date', '')
     end_date = request.args.get('end_date', '')
@@ -411,7 +422,8 @@ def get_service_orders():
             PDV.MaPDV, PDV.MaCTDP, PDV.DonGia, PDV.SoLuong, PDV.Ngay, PDV.Gio, 
             PDV.TrangThai as OrderStatus,
             DV.TenDV, DV.TrangThai as CatalogStatus,
-            P.SoPhong, KH.HoTen
+            P.SoPhong, KH.HoTen,
+            CT.MaDP, CT.MaCTDP -- Lấy thêm Mã đơn và Mã chi tiết
         FROM DATPHONG_DICHVU PDV
         JOIN DICHVU DV ON PDV.MaDV = DV.MaDV
         JOIN CHITIET_DATPHONG CT ON PDV.MaCTDP = CT.MaCTDP
@@ -435,8 +447,9 @@ def get_service_orders():
         params.append(end_date)
 
     if search:
-        sql += " AND (P.SoPhong LIKE ? OR KH.HoTen LIKE ? OR DV.TenDV LIKE ?)"
-        params.extend([f'%{search}%', f'%{search}%', f'%{search}%'])
+        # Thêm tìm kiếm theo CT.MaDP và CT.MaCTDP
+        sql += " AND (P.SoPhong LIKE ? OR KH.HoTen LIKE ? OR DV.TenDV LIKE ? OR CT.MaDP LIKE ? OR CT.MaCTDP LIKE ?)"
+        params.extend([f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%'])
 
     sql += " ORDER BY PDV.Ngay DESC, PDV.Gio DESC"
     cursor.execute(sql, params)
@@ -468,6 +481,139 @@ def update_service_status():
 
 # Kt services_manage_rec
 
+# checkout_rec
+@app.route('/api/rec/checkout-list', methods=['GET'])
+def get_checkout_list():
+    search = request.args.get('search', '')
+    # Thêm 2 tham số lọc mới
+    pay_filter = request.args.get('pay_filter', 'all')      # all, paid, unpaid
+    booking_filter = request.args.get('booking_filter', 'all') # all, Đang lưu trú, Hoàn tất
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Query cơ bản
+    sql = """
+        SELECT DP.*, KH.HoTen, KH.SDT
+        FROM DATPHONG DP
+        JOIN KHACHHANG KH ON DP.MaKH = KH.MaKH
+        WHERE DP.TrangThai IN ('Đang lưu trú', 'Hoàn tất')
+    """
+    params = []
+    # 1. Lọc theo tìm kiếm
+    if search:
+        sql += " AND (DP.MaDP LIKE ? OR KH.HoTen LIKE ?)"
+        params.extend([f'%{search}%', f'%{search}%'])
+
+    # 2. Lọc theo Trạng thái Đặt phòng (Staying / Completed)
+    if booking_filter != 'all':
+        sql += " AND DP.TrangThai = ?"
+        params.append(booking_filter)
+
+    # 3. Lọc theo Trạng thái Thanh toán (MaNV IS NULL/NOT NULL)
+    if pay_filter == 'paid':
+        sql += " AND DP.MaNV IS NOT NULL"
+    elif pay_filter == 'unpaid':
+        sql += " AND DP.MaNV IS NULL"
+
+    sql += " ORDER BY DP.NgayTao DESC"
+    cursor.execute(sql, params)
+
+    bookings = [dict(row) for row in cursor.fetchall()]
+
+    for b in bookings:
+        # 2. Lấy chi tiết phòng và Dịch vụ lồng nhau
+        cursor.execute("""
+            SELECT CT.*, LP.TenLoai, P.SoPhong 
+            FROM CHITIET_DATPHONG CT
+            JOIN LOAIPHONG LP ON CT.MaLoai = LP.MaLoai
+            LEFT JOIN PHONG P ON CT.MaPhong = P.MaPhong
+            WHERE CT.MaDP = ?
+        """, (b['MaDP'],))
+        chi_tiet_phong = [dict(row) for row in cursor.fetchall()]
+
+        tong_tien_phong = 0
+        tong_tien_dv = 0
+        all_rooms_handled = True  # Tất cả phòng đã Nhận/Trả/Hủy
+        all_rooms_returned = True  # Tất cả phòng đã Trả/Hủy (để Hoàn tất đơn)
+        all_services_handled = True  # Tất cả dịch vụ đã Phục vụ/Hủy
+
+        for ct in chi_tiet_phong:
+            # Lấy dịch vụ của từng phòng
+            cursor.execute("""
+                SELECT DPDV.*, DV.TenDV, DV.TinhTheoNgay 
+                FROM DATPHONG_DICHVU DPDV
+                JOIN DICHVU DV ON DPDV.MaDV = DV.MaDV
+                WHERE DPDV.MaCTDP = ?
+            """, (ct['MaCTDP'],))
+            ct['DichVu'] = [dict(row) for row in cursor.fetchall()]
+
+            # Kiểm tra trạng thái phòng cho logic Pay/Complete
+            if ct['TrangThai'] == 'Chờ nhận': all_rooms_handled = False
+            if ct['TrangThai'] == 'Đã nhận': all_rooms_returned = False
+
+            # Tính tiền phòng (chỉ tính phòng không bị Hủy)
+            if ct['TrangThai'] != 'Đã hủy':
+                tong_tien_phong += ct['GiaPhong']
+
+            # Kiểm tra trạng thái dịch vụ và tính tiền
+            for dv in ct['DichVu']:
+                if dv['TrangThai'] == 'Chờ xử lý':
+                    all_services_handled = False
+                if dv['TrangThai'] == 'Đã phục vụ':
+                    tong_tien_dv += (dv['DonGia'] * dv['SoLuong'])
+
+        b['ChiTiet'] = chi_tiet_phong
+        b['TongTienThucTe'] = tong_tien_phong + tong_tien_dv
+
+        # LOGIC ĐIỀU KIỆN
+        # Thanh toán được khi: Đang lưu trú + (Phòng != Chờ nhận) + (Dịch vụ != Chờ xử lý) + Chưa có MaNV
+        b['CanPay'] = (b['TrangThai'] == 'Đang lưu trú' and
+                       all_rooms_handled and
+                       all_services_handled and
+                       b['MaNV'] is None)
+
+        # Hoàn tất được khi: Đang lưu trú + Đã có MaNV + Tất cả phòng đã Trả/Hủy
+        b['CanComplete'] = (b['TrangThai'] == 'Đang lưu trú' and
+                            b['MaNV'] is not None and
+                            all_rooms_returned)
+
+    conn.close()
+    return jsonify(bookings)
+
+
+@app.route('/api/rec/process-payment', methods=['POST'])
+def api_process_payment():
+    data = request.json
+    ma_dp = data.get('ma_dp')
+    ma_nv = data.get('ma_nv')
+    tong_tien = data.get('tong_tien')
+    phuong_thuc = data.get('phuong_thuc')  # Phương thức do lễ tân chọn lại
+
+    conn = get_db()
+    # Cập nhật cả tổng tiền thực tế, phương thức thanh toán và mã nhân viên thu tiền
+    conn.execute("""
+        UPDATE DATPHONG 
+        SET TongTien = ?, ThanhToan = ?, MaNV = ? 
+        WHERE MaDP = ?
+    """, (tong_tien, phuong_thuc, ma_nv, ma_dp))
+
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success"})
+
+# API Cập nhật trạng thái chi tiết phòng (Dùng để Checkout từng phòng)
+@app.route('/api/rec/update-detail-status', methods=['POST'])
+def api_update_detail_status():
+    data = request.json
+    conn = get_db()
+    conn.execute("UPDATE CHITIET_DATPHONG SET TrangThai = ? WHERE MaCTDP = ?",
+                 (data['status'], data['ma_ctdp']))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success"})
+
+# Kt checkout
 
 # customer_list_rec
 @app.route('/api/rec/customers', methods=['GET'])

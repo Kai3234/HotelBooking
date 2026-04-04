@@ -193,7 +193,10 @@ def unassign_room(ma_ctdp):
 @app.route('/checkin_rec')
 def checkin_rec():
     search = request.args.get('search', '')
-    status_filter = request.args.get('status_filter', 'all')  # Lấy từ request
+    status_filter = request.args.get('status_filter', 'all')
+
+    # 1. Lấy ngày xử lý từ URL, mặc định là ngày hôm nay
+    process_date = request.args.get('process_date', date.today().isoformat())
 
     # Gửi tham số lọc sang API
     res = requests.get(f"{API_BASE_URL}/checkin-list", params={
@@ -202,13 +205,13 @@ def checkin_rec():
     })
 
     bookings = res.json() if res.status_code == 200 else []
-    today = date.today().isoformat()
 
+    # 2. Truyền process_date vào biến today của template
     return render_template('receptionist/checkin_rec.html',
                            bookings=bookings,
                            search_query=search,
-                           status_filter=status_filter,  # Truyền lại sang HTML để giữ trạng thái select
-                           today=today)
+                           status_filter=status_filter,
+                           today=process_date)  # Biến today trong HTML sẽ là ngày được chọn
 
 
 @app.route('/confirm_checkin_detail/<int:ma_ctdp>')
@@ -239,9 +242,83 @@ def cancel_booking(ma_dp):
 # checkout_rec
 @app.route('/checkout_rec')
 def checkout_rec():
-    return render_template('receptionist/checkout_rec.html')
+    # Lấy tất cả các tham số lọc từ request.args
+    search = request.args.get('search', '')
+    pay_filter = request.args.get('pay_filter', 'all')
+    booking_filter = request.args.get('booking_filter', 'all')
+    process_date = request.args.get('process_date', date.today().isoformat())
+
+    # Gửi tất cả tham số sang API
+    params = {
+        'search': search,
+        'pay_filter': pay_filter,
+        'booking_filter': booking_filter
+    }
+
+    try:
+        res = requests.get(f"{API_BASE_URL}/checkout-list", params=params)
+        bookings = res.json() if res.status_code == 200 else []
+    except:
+        bookings = []
+
+    return render_template('receptionist/checkout_rec.html',
+                           bookings=bookings,
+                           search_query=search,
+                           pay_filter=pay_filter,  # Gửi lại để HTML nhận
+                           booking_filter=booking_filter,  # Gửi lại để HTML nhận
+                           today=process_date)
 
 
+@app.route('/pay_booking/<int:ma_dp>', methods=['POST'])
+def pay_booking(ma_dp):
+    # 1. Lấy dữ liệu từ form HTML
+    tong_tien = request.form.get('total')
+    # Đây là giá trị từ <select name="payment_method">
+    phuong_thuc_moi = request.form.get('payment_method')
+
+    # 2. Lấy ID nhân viên từ session (người đang trực máy)
+    ma_nv = session['current_user']['MaTK']
+
+    if not ma_nv:
+        flash("Vui lòng đăng nhập để thực hiện thanh toán!", "danger")
+        return redirect(url_for('login'))
+
+    # 3. Gọi API xử lý logic cập nhật DB
+    try:
+        payload = {
+            'ma_dp': ma_dp,
+            'ma_nv': ma_nv,
+            'tong_tien': tong_tien,
+            'phuong_thuc': phuong_thuc_moi  # Gửi giá trị mới này lên Server
+        }
+        res = requests.post(f"{API_BASE_URL}/process-payment", json=payload)
+
+        if res.status_code == 200:
+            flash(f"Thanh toán đơn #{ma_dp} thành công!", "success")
+        else:
+            flash("Lỗi xử lý thanh toán: " + res.json().get('message', 'Unknown'), "danger")
+
+    except Exception as e:
+        flash("Lỗi kết nối API: " + str(e), "danger")
+
+    return redirect(url_for('checkout_rec'))
+
+@app.route('/confirm_checkout_detail/<int:ma_ctdp>')
+def confirm_checkout_detail(ma_ctdp):
+    # Gọi sang API Server cập nhật trạng thái 'Đã trả'
+    res = requests.post(f"{API_BASE_URL}/update-detail-status",
+                        json={'ma_ctdp': ma_ctdp, 'status': 'Đã trả'})
+    if res.status_code == 200:
+        flash("Cập nhật trạng thái phòng thành công!", "success")
+    else:
+        flash("Lỗi khi trả phòng!", "danger")
+    return redirect(url_for('checkout_rec'))
+
+@app.route('/complete_booking/<int:ma_dp>')
+def complete_booking(ma_dp):
+    requests.post(f"{API_BASE_URL}/update-booking-status", json={'ma_dp': ma_dp, 'status': 'Hoàn tất'})
+    flash("Đơn đặt đã hoàn tất!", "success")
+    return redirect(url_for('checkout_rec'))
 # Kt Checkout_rec
 
 

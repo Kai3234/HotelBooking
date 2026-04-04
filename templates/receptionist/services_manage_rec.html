@@ -96,7 +96,7 @@
         <table>
             <thead>
                 <tr>
-                    <th>Phòng / Khách</th>
+                    <th>Mã Đơn / CT / Phòng</th> <!-- Đổi tiêu đề cho phù hợp -->
                     <th>Nội dung Dịch vụ</th>
                     <th>Thời gian yêu cầu</th>
                     <th>Tổng Tiền</th>
@@ -108,6 +108,8 @@
                 {% for o in orders %}
                 <tr>
                     <td>
+                        <small style="color: gray;">DP: #{{ o.MaDP }}</small><br>
+                        <small style="color: gray;">CT: #{{ o.MaCTDP }}</small><br>
                         <span style="color: var(--primary-red); font-size: 15px; font-weight: bold;">
                             {% if o.SoPhong %}Phòng {{ o.SoPhong }}{% else %}Chưa gán phòng{% endif %}
                         </span><br>

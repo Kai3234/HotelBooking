@@ -8,21 +8,41 @@
 <!-- 1. THANH CÔNG CỤ -->
 <div class="card" style="margin-bottom: 20px; padding: 15px 25px;">
     <form method="GET" action="{{ url_for('checkin_rec') }}" class="toolbar" style="margin-bottom: 0;">
-        <div class="search-box" style="width: 350px;">
+
+        <!-- Ô tìm kiếm -->
+        <div class="search-box" style="width: 300px;">
             <i class="fa-solid fa-search"></i>
-            <input type="text" name="search" value="{{ search_query }}" placeholder="Mã đơn, Tên hoặc SĐT khách...">
+            <input type="text" name="search" value="{{ search_query }}" placeholder="Mã đơn, Tên hoặc SĐT...">
         </div>
-        <div class="filter-group">
-            <label style="font-weight: 600; font-size: 14px;">Trạng thái đơn:</label>
-            <select name="status_filter" class="form-control" style="width: 180px;" onchange="this.form.submit()">
-                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Tất cả trạng thái</option>
-                <option value="Chờ xác nhận" {% if status_filter == 'Chờ xác nhận' %}selected{% endif %}>Chờ xác nhận</option>
-                <option value="Đã xác nhận" {% if status_filter == 'Đã xác nhận' %}selected{% endif %}>Đã xác nhận - Chờ Check-in</option>
-                <option value="Đang lưu trú" {% if status_filter == 'Đang lưu trú' %}selected{% endif %}>Đang lưu trú - Đã nhận</option>
-                <option value="Hoàn tất" {% if status_filter == 'Hoàn tất' %}selected{% endif %}>Hoàn tất</option>
-                <option value="Đã hủy" {% if status_filter == 'Đã hủy' %}selected{% endif %}>Đã hủy</option>
-            </select>
+
+        <div class="filter-group" style="display: flex; gap: 15px; align-items: center;">
+            <!-- CHỌN NGÀY XỬ LÝ (MỚI) -->
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <label style="font-weight: 600; font-size: 14px; white-space: nowrap;">Ngày xử lý:</label>
+                <input type="date" name="process_date" value="{{ today }}"
+                       class="form-control" style="width: 160px;"
+                       onchange="this.form.submit()">
+            </div>
+
+            <!-- Lọc trạng thái -->
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <label style="font-weight: 600; font-size: 14px; white-space: nowrap;">Trạng thái:</label>
+                <select name="status_filter" class="form-control" style="width: 180px;" onchange="this.form.submit()">
+                    <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Tất cả trạng thái</option>
+                    <option value="Chờ xác nhận" {% if status_filter == 'Chờ xác nhận' %}selected{% endif %}>Chờ xác nhận</option>
+                    <option value="Đã xác nhận" {% if status_filter == 'Đã xác nhận' %}selected{% endif %}>Đã xác nhận - Chờ Check-in</option>
+                    <option value="Đang lưu trú" {% if status_filter == 'Đang lưu trú' %}selected{% endif %}>Đang lưu trú - Đã nhận</option>
+                    <option value="Hoàn tất" {% if status_filter == 'Hoàn tất' %}selected{% endif %}>Hoàn tất</option>
+                    <option value="Đã hủy" {% if status_filter == 'Đã hủy' %}selected{% endif %}>Đã hủy</option>
+                </select>
+            </div>
+
             <button type="submit" class="btn btn-primary">Lọc</button>
+
+            <!-- Nút Reset nhanh về ngày hôm nay -->
+            <a href="{{ url_for('checkin_rec') }}" class="btn btn-outline" title="Về hôm nay">
+                <i class="fa-solid fa-calendar-day"></i>
+            </a>
         </div>
     </form>
 </div>

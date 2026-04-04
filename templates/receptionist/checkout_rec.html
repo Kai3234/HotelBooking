@@ -1,154 +1,147 @@
 {% extends 'layout/base_backend.html' %}
 
 {% block title %}Check-out & Thanh toán - RedHotel{% endblock %}
-{% block page_title %}Trả phòng & Xuất hóa đơn{% endblock %}
+{% block page_title %}Trả phòng & Thanh toán{% endblock %}
 
 {% block content %}
-
-<!-- THANH CÔNG CỤ -->
+<!-- 1. THANH CÔNG CỤ -->
 <div class="card" style="margin-bottom: 20px; padding: 15px 25px;">
-    <div class="toolbar" style="margin-bottom: 0;">
-        <div class="search-box">
+    <form method="GET" action="{{ url_for('checkout_rec') }}" class="toolbar" style="margin-bottom: 0; gap: 15px; display: flex; flex-wrap: wrap;">
+
+        <!-- Ô tìm kiếm -->
+        <div class="search-box" style="width: 250px;">
             <i class="fa-solid fa-search"></i>
-            <input type="text" placeholder="Tìm theo Mã đơn, Số phòng đang ở...">
+            <input type="text" name="search" value="{{ search_query }}" placeholder="Mã đơn, Tên khách...">
         </div>
+
+        <!-- Lọc trạng thái đặt phòng -->
         <div class="filter-group">
-            <button class="btn btn-danger" style="opacity: 0.8;"><i class="fa-solid fa-clock"></i> Khách trả phòng hôm nay</button>
+            <label style="font-weight: 600; font-size: 13px;">Trạng thái:</label>
+            <select name="booking_filter" class="form-control" style="width: 150px;" onchange="this.form.submit()">
+                <option value="all" {% if booking_filter == 'all' %}selected{% endif %}>Tất cả đơn</option>
+                <option value="Đang lưu trú" {% if booking_filter == 'Đang lưu trú' %}selected{% endif %}>Đang lưu trú</option>
+                <option value="Hoàn tất" {% if booking_filter == 'Hoàn tất' %}selected{% endif %}>Đã hoàn tất</option>
+            </select>
         </div>
-    </div>
+
+        <!-- Lọc trạng thái thanh toán -->
+        <div class="filter-group">
+            <label style="font-weight: 600; font-size: 13px;">Thanh toán:</label>
+            <select name="pay_filter" class="form-control" style="width: 160px;" onchange="this.form.submit()">
+                <option value="all" {% if pay_filter == 'all' %}selected{% endif %}>Tất cả thanh toán</option>
+                <option value="unpaid" {% if pay_filter == 'unpaid' %}selected{% endif %}>🔴 Chờ thanh toán</option>
+                <option value="paid" {% if pay_filter == 'paid' %}selected{% endif %}>🟢 Đã thanh toán</option>
+            </select>
+        </div>
+
+        <!-- Ngày xử lý -->
+        <div class="filter-group">
+            <label style="font-weight: 600; font-size: 13px;">Ngày Checkout:</label>
+            <input type="date" name="process_date" value="{{ today }}" class="form-control" style="width: 150px;" onchange="this.form.submit()">
+        </div>
+
+        <div style="display: flex; gap: 5px;">
+            <button type="submit" class="btn btn-primary">Lọc</button>
+            <a href="{{ url_for('checkout_rec') }}" class="btn btn-outline" title="Xóa lọc">
+                <i class="fa-solid fa-rotate-left"></i>
+            </a>
+        </div>
+    </form>
 </div>
 
-<!-- BẢNG DANH SÁCH ĐANG LƯU TRÚ -->
-<div class="card">
-    <div class="table-responsive">
-        <table>
-            <thead>
+<!-- 2. DANH SÁCH ĐƠN ĐANG XỬ LÝ -->
+{% for dp in bookings %}
+<div class="card" style="margin-bottom: 30px; border-left: 5px solid {% if dp.MaNV %}#50CD89{% else %}#F1416C{% endif %};">
+    <!-- Header: Hiển thị Tổng tiền thực tế -->
+    <div class="card-header">
+        <div style="display: flex; justify-content: space-between; width: 100%;">
+            <div>
+                <span class="badge {% if dp.TrangThai == 'Hoàn tất' %}badge-secondary{% else %}badge-info{% endif %}">{{ dp.TrangThai }}</span>
+                {% if dp.MaNV %}
+                    <span class="badge badge-success"><i class="fa-solid fa-check"></i> Đã thanh toán (NV: {{ dp.MaNV }})</span>
+                {% endif %}
+                <h3>Đơn #{{ dp.MaDP }} - {{ dp.HoTen }}</h3>
+            </div>
+            <div style="text-align: right;">
+                <p style="margin:0; font-size:12px; color:gray;">Tổng thanh toán thực tế:</p>
+                <strong style="font-size: 24px; color: var(--primary-red);">{{ "{:,.0f}".format(dp.TongTienThucTe) }}₫</strong>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body" style="padding: 0;">
+        <table class="table" style="margin-bottom: 0;">
+            <thead class="bg-light">
                 <tr>
-                    <th>Mã Đơn</th>
-                    <th>Phòng</th>
-                    <th>Khách Hàng</th>
-                    <th>Ngày Trả (Dự kiến)</th>
-                    <th>Tạm Tính</th>
-                    <th>Hành Động</th>
+                    <th style="padding-left: 20px;">Thông tin Phòng & Dịch vụ</th>
+                    <th>Thời gian</th>
+                    <th>Đơn giá</th>
+                    <th>Trạng thái</th>
+                    <th>Thao tác</th>
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td><strong>#DP0995</strong></td>
-                    <td>
-                        <span style="font-size: 16px; font-weight: bold; color: var(--primary-red);">301</span>
+                {% for ct in dp.ChiTiet %}
+                <!-- Dòng PHÒNG -->
+                <tr style="background-color: #fcfcfc; font-weight: bold;">
+                    <td style="padding-left: 20px;">
+                        <i class="fa-solid fa-door-open"></i> P.{{ ct.SoPhong }} - {{ ct.TenLoai }}
                     </td>
-                    <td>Lê Đức C<br><small>0912345678</small></td>
-                    <td><span style="color: #F1416C; font-weight: 600;">Hôm nay (02/04)</span></td>
-                    <td><strong>2,000,000đ</strong></td>
+                    <td>{{ ct.NgayNhan }} ➔ {{ ct.NgayTra }}</td>
+                    <td>{{ "{:,.0f}".format(ct.GiaPhong) }}₫</td>
+                    <td><span class="badge badge-outline">{{ ct.TrangThai }}</span></td>
                     <td>
-                        <button class="btn-sm btn-danger" style="background-color: #333;" onclick="openCheckoutModal('DP0995', '301', 'Lê Đức C', 2000000)">
-                            <i class="fa-solid fa-file-invoice-dollar"></i> Trả phòng & Thanh toán
-                        </button>
+                        {% if ct.TrangThai == 'Đã nhận' and ct.NgayTra == today %}
+                        <a href="{{ url_for('confirm_checkout_detail', ma_ctdp=ct.MaCTDP) }}" class="btn-sm btn-primary">Trả phòng</a>
+                        {% endif %}
                     </td>
                 </tr>
+
+                <!-- Các dòng DỊCH VỤ của phòng đó -->
+                {% for dv in ct.DichVu %}
+                <tr style="font-size: 13px; color: #555;">
+                    <td style="padding-left: 50px;">
+                        <i class="fa-solid fa-concierge-bell" style="color: #FFA800;"></i>
+                        {{ dv.TenDV }} (x{{ dv.SoLuong }})
+                    </td>
+                    <td>{{ dv.Ngay }}</td>
+                    <td>{{ "{:,.0f}".format(dv.DonGia * dv.SoLuong) }}₫</td>
+                    <td>{{ dv.TrangThai }}</td>
+                    <td></td>
+                </tr>
+                {% endfor %}
+                {% endfor %}
             </tbody>
         </table>
     </div>
-</div>
 
-<!-- MODAL HÓA ĐƠN THANH TOÁN -->
-<div class="modal-overlay" id="checkoutModal">
-    <div class="modal-content" style="width: 650px;">
-        <div class="modal-header">
-            <h3><i class="fa-solid fa-file-invoice" style="color: var(--primary-red);"></i> Hóa Đơn Thanh Toán</h3>
-            <button class="btn-close" onclick="closeCheckoutModal()"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-        
-        <form action="#" method="POST">
-            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
-                <input type="hidden" name="ma_dp" id="co_ma_dp">
-                
-                <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
-                    <div>
-                        <p>Khách hàng: <strong id="co_ten_kh"></strong></p>
-                        <p>Phòng: <strong id="co_phong" style="color: var(--primary-red);"></strong></p>
-                    </div>
-                    <div style="text-align: right;">
-                        <p>Mã hóa đơn: <strong id="co_text_ma"></strong></p>
-                        <p>Ngày in: <strong>02/04/2026</strong></p>
-                    </div>
-                </div>
+    <!-- Footer: Nút bấm dựa trên CanPay và CanComplete -->
+    <div class="card-footer" style="display: flex; justify-content: flex-end; gap: 10px; background: #f8f9fa;">
 
-                <!-- Bảng chi tiết tiền -->
-                <table style="width: 100%; margin-bottom: 20px; font-size: 14px;">
-                    <thead style="background-color: var(--bg-light);">
-                        <tr>
-                            <th>Nội dung</th>
-                            <th style="text-align: center;">SL</th>
-                            <th style="text-align: right;">Đơn giá</th>
-                            <th style="text-align: right;">Thành tiền</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Dữ liệu mẫu (Team Backend dùng vòng lặp render ra) -->
-                        <tr>
-                            <td>Tiền phòng (Suite VIP - 1 Đêm)</td>
-                            <td style="text-align: center;">1</td>
-                            <td style="text-align: right;">1,500,000</td>
-                            <td style="text-align: right;">1,500,000</td>
-                        </tr>
-                        <tr>
-                            <td>Dịch vụ: Gói Honeymoon</td>
-                            <td style="text-align: center;">1</td>
-                            <td style="text-align: right;">500,000</td>
-                            <td style="text-align: right;">500,000</td>
-                        </tr>
-                    </tbody>
-                    <tfoot style="border-top: 2px solid var(--border-color);">
-                        <tr>
-                            <td colspan="3" style="text-align: right; font-weight: bold;">Tổng cộng:</td>
-                            <td style="text-align: right; font-weight: bold;">2,000,000đ</td>
-                        </tr>
-                        <tr>
-                            <td colspan="3" style="text-align: right; color: gray;">Tiền đã cọc trước:</td>
-                            <td style="text-align: right; color: gray;">- 500,000đ</td>
-                        </tr>
-                        <tr>
-                            <td colspan="3" style="text-align: right; font-size: 18px; font-weight: 900; color: var(--primary-red);">CẦN THANH TOÁN:</td>
-                            <td style="text-align: right; font-size: 18px; font-weight: 900; color: var(--primary-red);">1,500,000đ</td>
-                        </tr>
-                    </tfoot>
-                </table>
-
-                <!-- Chọn phương thức thanh toán -->
-                <div class="form-group" style="background-color: var(--light-red); padding: 15px; border-radius: 8px;">
-                    <label style="color: var(--primary-red);">Xác nhận Phương thức thanh toán <span class="required">*</span></label>
-                    <select class="form-control" name="phuong_thuc_tt" required style="border-color: var(--primary-red);">
-                        <option value="">-- Chọn phương thức --</option>
-                        <option value="Tiền mặt">Tiền mặt</option>
-                        <option value="Chuyển khoản / VNPay">Chuyển khoản / Mã QR</option>
-                        <option value="Thẻ tín dụng (POS)">Quẹt thẻ tín dụng (POS)</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="modal-footer" style="justify-content: space-between;">
-                <button type="button" class="btn btn-outline"><i class="fa-solid fa-print"></i> In Hóa Đơn</button>
-                <div>
-                    <button type="button" class="btn btn-outline" onclick="closeCheckoutModal()">Hủy</button>
-                    <!-- Nút này Submit form -->
-                    <button type="submit" class="btn btn-danger" style="background-color: #333;"><i class="fa-solid fa-check-double"></i> Xác Nhận Thanh Toán & Trả Phòng</button>
-                </div>
-            </div>
+        {% if dp.CanPay %}
+        <form action="{{ url_for('pay_booking', ma_dp=dp.MaDP) }}" method="POST" style="display: flex; gap: 10px; align-items: center;">
+            <input type="hidden" name="total" value="{{ dp.TongTienThucTe }}">
+            <select name="payment_method" class="form-control" style="width: 200px;" required>
+                <option value="Tiền mặt" {% if dp.ThanhToan == 'Tiền mặt' %}selected{% endif %}>Tiền mặt</option>
+                <option value="Chuyển khoản" {% if dp.ThanhToan == 'Chuyển khoản' %}selected{% endif %}>Chuyển khoản</option>
+                <option value="VNPay" {% if dp.ThanhToan == 'VNPay' %}selected{% endif %}>VNPay</option>
+            </select>
+            <button type="submit" class="btn btn-success" onclick="return confirm('Xác nhận thu tiền?')">
+                <i class="fa-solid fa-cash-register"></i> XÁC NHẬN THANH TOÁN
+            </button>
         </form>
+        {% endif %}
+
+        {% if dp.CanComplete %}
+            <a href="{{ url_for('complete_booking', ma_dp=dp.MaDP) }}" class="btn btn-primary" style="background: #8950FC;">
+                <i class="fa-solid fa-flag-checkered"></i> XÁC NHẬN HOÀN TẤT ĐƠN
+            </a>
+        {% endif %}
+
+        {% if dp.TrangThai == 'Hoàn tất' %}
+            <span class="text-success" style="font-weight: bold;"><i class="fa-solid fa-check-double"></i> ĐƠN HÀNG ĐÃ ĐÓNG</span>
+        {% endif %}
     </div>
 </div>
-
-<script>
-    function openCheckoutModal(maDp, phong, ten, tongTien) {
-        document.getElementById('co_text_ma').innerText = '#' + maDp;
-        document.getElementById('co_phong').innerText = 'Phòng ' + phong;
-        document.getElementById('co_ten_kh').innerText = ten;
-        document.getElementById('co_ma_dp').value = maDp;
-        document.getElementById('checkoutModal').classList.add('show');
-    }
-    function closeCheckoutModal() { document.getElementById('checkoutModal').classList.remove('show'); }
-</script>
-
+{% endfor %}
 {% endblock %}
