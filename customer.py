@@ -33,6 +33,7 @@ def index():
 @app.route('/rooms_list')
 def rooms_list():
     rooms = []
+    all_types = []
     # Bổ sung: lấy thêm các field lọc từ file HTML (max_price, room_type, adults, children)
     max_price = request.args.get('max_price', 10000000)
     room_type = request.args.get('room_type', '')
@@ -47,10 +48,17 @@ def rooms_list():
     search_params = {
         'max_price': max_price,
         'room_type': room_type,
-        'guests': total_guests
+        'guests': total_guests,
+        'checkin': request.args.get('checkin', '').strip(),
+        'checkout': request.args.get('checkout', '').strip()
     }
 
     try:
+        # Lấy danh sách loại phòng cho Dropdown menu
+        res_types = requests.get(f"{BASE_URL}/api/all_room_types", timeout=5)
+        if res_types.status_code == 200:
+            all_types = res_types.json().get('data', [])
+
         response = requests.get(f"{BASE_URL}/api/search_rooms", params=search_params, timeout=5)
         if response.status_code == 200:
             rooms = response.json().get('data', [])
@@ -58,7 +66,7 @@ def rooms_list():
                 r['HinhAnhDaiDien'] = fix_image_url(r.get('HinhAnhDaiDien'))
     except Exception as e:
         print(f"Loi goi API Danh sach phong: {e}")
-    return render_template('customer/rooms_list.html', loaiphong_list=rooms)
+    return render_template('customer/rooms_list.html', loaiphong_list=rooms, all_types=all_types)
 
 
 @app.route('/rooms_detail/<ma_loai>')
@@ -133,6 +141,9 @@ def services():
 
 @app.route('/cart')
 def cart_view():
+    if 'current_user' not in session:
+        return redirect(url_for('login'))
+
     cart_items = session.get('cart', [])
     tong_tien_phong = sum(int(item.get('GiaTien', 0)) for item in cart_items)
     tong_tien_dichvu = 0
@@ -145,9 +156,18 @@ def cart_view():
 
 @app.route('/add_to_cart', methods=['POST'])
 def add_to_cart():
+    if 'current_user' not in session:
+        return redirect(url_for('login'))
+
     ma_loai = request.form.get('ma_loai')
-    checkin = request.form.get('checkin') or "Chua chon"
-    checkout = request.form.get('checkout') or "Chua chon"
+    checkin = request.form.get('checkin', '').strip()
+    checkout = request.form.get('checkout', '').strip()
+    action_type = request.form.get('action_type', '')
+
+    if not checkin or not checkout or checkin == "Chua chon" or checkout == "Chua chon":
+        flash("Lỗi hệ thống: Bắt buộc chọn Ngày Nhận Phòng và Ngày Trả Phòng!", "danger")
+        return redirect(request.referrer or url_for('rooms_list'))
+
     if 'cart' not in session: session['cart'] = []
     try:
         response = requests.get(f"{BASE_URL}/api/room/{ma_loai}", timeout=5)
@@ -158,6 +178,11 @@ def add_to_cart():
             room_data.update({'checkin': checkin, 'checkout': checkout, 'services': []})
             session['cart'].append(room_data)
             session.modified = True
+
+            if action_type == 'add_only':
+                flash(f"Thành công! Đã thêm {room_data.get('TenLoai', 'phòng')} vào giỏ hàng.", "success")
+                return redirect(request.referrer or url_for('rooms_list'))
+
     except Exception as e:
         print(f"Loi them gio hang: {e}")
     return redirect(url_for('cart_view'))
@@ -259,6 +284,9 @@ def profile():
 
 @app.route('/add_service_to_cart', methods=['POST'])
 def add_service_to_cart():
+    if 'current_user' not in session: 
+        return redirect(url_for('login'))
+
     if 'cart' not in session: return redirect(url_for('rooms_list'))
 
     item_index = int(request.form.get('item_index', 0))
@@ -303,6 +331,9 @@ def cancel_booking_route():
 
 @app.route('/remove_from_cart/<int:index>')
 def remove_from_cart(index):
+    if 'current_user' not in session:
+        return redirect(url_for('login'))
+
     # Lấy giỏ hàng từ session
     cart = session.get('cart', [])
 
