@@ -157,6 +157,41 @@
             }
         });
     });
+
+    const checkinInput = document.querySelector('input[name="checkin_date"]');
+    const checkoutInput = document.querySelector('input[name="checkout_date"]');
+
+    checkinInput.addEventListener('change', function() {
+        if (checkinInput.value) {
+            // Tạo đối tượng ngày từ ngày check-in
+            let checkinDate = new Date(checkinInput.value);
+
+            // Cộng thêm 1 ngày
+            checkinDate.setDate(checkinDate.getDate() + 1);
+
+            // Định dạng lại thành YYYY-MM-DD
+            let minCheckout = checkinDate.toISOString().split('T')[0];
+
+            // Gán giá trị min cho ô checkout
+            checkoutInput.min = minCheckout;
+
+            // Nếu ngày checkout hiện tại đang nhỏ hơn hoặc bằng ngày checkin mới
+            if (checkoutInput.value <= checkinInput.value) {
+                checkoutInput.value = minCheckout;
+            }
+        }
+    });
+
+    // Ngược lại: Đảm bảo khi chọn Checkout trước, nó cũng giới hạn Checkin
+    checkoutInput.addEventListener('change', function() {
+        if (checkoutInput.value) {
+            let checkoutDate = new Date(checkoutInput.value);
+            checkoutDate.setDate(checkoutDate.getDate() - 1);
+            let maxCheckin = checkoutDate.toISOString().split('T')[0];
+
+            checkinInput.max = maxCheckin;
+        }
+    });
 </script>
 
 {% endblock %}

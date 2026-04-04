@@ -244,6 +244,48 @@
         el.classList.add('active');
         document.getElementById('tab-' + tabId).classList.add('active');
     }
+
+    const checkinInput = document.querySelector('input[name="start_date"]');
+    const checkoutInput = document.querySelector('input[name="end_date"]');
+
+    // Khi chọn start_date
+    checkinInput.addEventListener('change', function () {
+
+        if (!checkinInput.value) return;
+
+        const checkinDate = new Date(checkinInput.value);
+
+        // Checkout phải >= Checkin
+        const minCheckout = checkinInput.value;
+        checkoutInput.min = minCheckout;
+
+        // Nếu checkout đang nhỏ hơn checkin → sửa lại
+        if (
+            checkoutInput.value &&
+            new Date(checkoutInput.value) < checkinDate
+        ) {
+            checkoutInput.value = minCheckout;
+        }
+    });
+
+
+    // Khi chọn end_date
+    checkoutInput.addEventListener('change', function () {
+
+        if (!checkoutInput.value) return;
+
+        const checkoutDate = new Date(checkoutInput.value);
+
+        // Checkin không được lớn hơn checkout
+        checkinInput.max = checkoutInput.value;
+
+        if (
+            checkinInput.value &&
+            new Date(checkinInput.value) > checkoutDate
+        ) {
+            checkinInput.value = checkoutInput.value;
+        }
+    });
 </script>
 {% endblock %}
 
