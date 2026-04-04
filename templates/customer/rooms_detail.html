@@ -168,9 +168,51 @@
 
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        flatpickr("#checkin", { dateFormat: "d/m/Y", minDate: "today", animate: true });
-        flatpickr("#checkout", { dateFormat: "d/m/Y", minDate: "today", animate: true });
+    document.addEventListener('DOMContentLoaded', function () {
+
+        let pickerOut;
+
+        const pickerIn = flatpickr("#checkin", {
+            dateFormat: "d/m/Y",
+            minDate: "today",
+            animate: true,
+
+            onChange: function(selectedDates) {
+
+                if (!selectedDates.length) return;
+
+                const checkinDate = selectedDates[0];
+
+                // Checkout phải > checkin ( +1 ngày )
+                const minCheckout = new Date(checkinDate);
+                minCheckout.setDate(minCheckout.getDate() + 1);
+
+                pickerOut.set('minDate', minCheckout);
+
+                // Nếu checkout <= checkin → auto sửa
+                const currentOut = pickerOut.selectedDates[0];
+                if (!currentOut || currentOut <= checkinDate) {
+                    pickerOut.setDate(minCheckout, true);
+                }
+            }
+        });
+
+        pickerOut = flatpickr("#checkout", {
+            dateFormat: "d/m/Y",
+            minDate: new Date().fp_incr(1), // mặc định +1 ngày
+            animate: true,
+
+            onChange: function(selectedDates) {
+
+                if (!selectedDates.length) return;
+
+                const checkoutDate = selectedDates[0];
+
+                // Checkin luôn < checkout
+                pickerIn.set('maxDate', new Date(checkoutDate).fp_incr(-1));
+            }
+        });
+
     });
 </script>
 {% endblock %}

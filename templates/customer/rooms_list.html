@@ -235,17 +235,59 @@
 
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const config = { dateFormat: "d/m/Y", minDate: "today", onChange: syncDates };
-        const pickerIn = flatpickr("#checkin", config);
-        const pickerOut = flatpickr("#checkout", config);
+    document.addEventListener('DOMContentLoaded', function () {
 
+        let checkoutPicker;
+
+        const checkinPicker = flatpickr("#checkin", {
+            dateFormat: "d/m/Y",
+            minDate: "today",
+
+            onChange: function(selectedDates) {
+
+                if (!selectedDates.length) return;
+
+                // +1 ngày
+                const nextDay = new Date(selectedDates[0]);
+                nextDay.setDate(nextDay.getDate() + 1);
+
+                // checkout phải > checkin
+                checkoutPicker.set("minDate", nextDay);
+
+                // nếu checkout sai -> tự sửa
+                if (
+                    !checkoutPicker.selectedDates.length ||
+                    checkoutPicker.selectedDates[0] <= selectedDates[0]
+                ) {
+                    checkoutPicker.setDate(nextDay, true);
+                }
+
+                syncDates();
+            }
+        });
+
+        checkoutPicker = flatpickr("#checkout", {
+            dateFormat: "d/m/Y",
+            minDate: new Date().fp_incr(1),
+
+            onChange: syncDates
+        });
+
+
+        /* =====================
+           SYNC FORM VALUE
+        ===================== */
         function syncDates() {
-            let cin = document.getElementById('checkin').value;
-            let cout = document.getElementById('checkout').value;
-            document.querySelectorAll('.sync-checkin').forEach(i => i.value = cin);
-            document.querySelectorAll('.sync-checkout').forEach(i => i.value = cout);
+            const cin = document.getElementById('checkin').value;
+            const cout = document.getElementById('checkout').value;
+
+            document.querySelectorAll('.sync-checkin')
+                .forEach(i => i.value = cin);
+
+            document.querySelectorAll('.sync-checkout')
+                .forEach(i => i.value = cout);
         }
+
         syncDates();
     });
 </script>

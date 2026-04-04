@@ -161,35 +161,52 @@
     const checkinInput = document.querySelector('input[name="checkin_date"]');
     const checkoutInput = document.querySelector('input[name="checkout_date"]');
 
-    checkinInput.addEventListener('change', function() {
-        if (checkinInput.value) {
-            // Tạo đối tượng ngày từ ngày check-in
-            let checkinDate = new Date(checkinInput.value);
+        // Hàm cộng 1 ngày
+    function addOneDay(dateStr) {
+        const d = new Date(dateStr);
+        d.setDate(d.getDate() + 1);
 
-            // Cộng thêm 1 ngày
-            checkinDate.setDate(checkinDate.getDate() + 1);
+        return d.toISOString().split('T')[0];
+    }
 
-            // Định dạng lại thành YYYY-MM-DD
-            let minCheckout = checkinDate.toISOString().split('T')[0];
+    // Khi chọn start_date
+    checkinInput.addEventListener('change', function () {
 
-            // Gán giá trị min cho ô checkout
-            checkoutInput.min = minCheckout;
+        if (!checkinInput.value) return;
 
-            // Nếu ngày checkout hiện tại đang nhỏ hơn hoặc bằng ngày checkin mới
-            if (checkoutInput.value <= checkinInput.value) {
-                checkoutInput.value = minCheckout;
-            }
+        const minCheckout = addOneDay(checkinInput.value);
+
+        // checkout phải > checkin
+        checkoutInput.min = minCheckout;
+
+        // Nếu checkout <= checkin → auto sửa
+        if (
+            checkoutInput.value &&
+            checkoutInput.value < minCheckout
+        ) {
+            checkoutInput.value = minCheckout;
         }
     });
 
-    // Ngược lại: Đảm bảo khi chọn Checkout trước, nó cũng giới hạn Checkin
-    checkoutInput.addEventListener('change', function() {
-        if (checkoutInput.value) {
-            let checkoutDate = new Date(checkoutInput.value);
-            checkoutDate.setDate(checkoutDate.getDate() - 1);
-            let maxCheckin = checkoutDate.toISOString().split('T')[0];
 
-            checkinInput.max = maxCheckin;
+    // Khi chọn end_date
+    checkoutInput.addEventListener('change', function () {
+
+        if (!checkoutInput.value) return;
+
+        const checkoutDate = new Date(checkoutInput.value);
+
+        // checkin phải < checkout
+        const maxCheckin = new Date(checkoutDate);
+        maxCheckin.setDate(maxCheckin.getDate() - 1);
+
+        checkinInput.max = maxCheckin.toISOString().split('T')[0];
+
+        if (
+            checkinInput.value &&
+            checkinInput.value > checkinInput.max
+        ) {
+            checkinInput.value = checkinInput.max;
         }
     });
 </script>

@@ -265,15 +265,65 @@
 
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        flatpickr("#checkin", { dateFormat: "d/m/Y", minDate: "today", animate: true });
-        flatpickr("#checkout", { dateFormat: "d/m/Y", minDate: "today", animate: true });
+    document.addEventListener('DOMContentLoaded', function () {
+
+        /* ======================
+           GUEST PICKER
+        ====================== */
         const guestPicker = document.getElementById('guestPicker');
         const guestDropdown = document.getElementById('guestDropdown');
-        guestPicker.addEventListener('click', (e) => { e.stopPropagation(); guestDropdown.classList.toggle('show'); guestPicker.classList.toggle('active'); });
-        document.addEventListener('click', (e) => { if (!guestPicker.contains(e.target)) { guestDropdown.classList.remove('show'); guestPicker.classList.remove('active'); } });
-        guestDropdown.addEventListener('click', (e) => e.stopPropagation());
+
+        guestPicker.addEventListener('click', (e) => {
+            e.stopPropagation();
+            guestDropdown.classList.toggle('show');
+            guestPicker.classList.toggle('active');
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!guestPicker.contains(e.target)) {
+                guestDropdown.classList.remove('show');
+                guestPicker.classList.remove('active');
+            }
+        });
+
+        guestDropdown.addEventListener('click', e => e.stopPropagation());
+
+
+        /* ======================
+           DATE PICKER
+        ====================== */
+
+        let checkoutPicker;
+
+        const checkinPicker = flatpickr("#checkin", {
+            dateFormat: "d/m/Y",
+            minDate: "today",
+
+            onChange: function(selectedDates) {
+
+                if (!selectedDates.length) return;
+
+                const nextDay = new Date(selectedDates[0]);
+                nextDay.setDate(nextDay.getDate() + 1);
+
+                // checkout luôn > checkin
+                checkoutPicker.set("minDate", nextDay);
+
+                if (
+                    !checkoutPicker.selectedDates.length ||
+                    checkoutPicker.selectedDates[0] <= selectedDates[0]
+                ) {
+                    checkoutPicker.setDate(nextDay, true);
+                }
+            }
+        });
+
+    checkoutPicker = flatpickr("#checkout", {
+        dateFormat: "d/m/Y",
+        minDate: new Date().fp_incr(1)
     });
+
+});
     
     function syncDatesToForm(formElement) {
         let cin = document.getElementById('checkin').value;
@@ -302,5 +352,6 @@
         document.getElementById('displayText').innerText = text;
     }
     function closePicker() { document.getElementById('guestDropdown').classList.remove('show'); document.getElementById('guestPicker').classList.remove('active'); }
+
 </script>
 {% endblock %}

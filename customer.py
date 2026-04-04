@@ -234,17 +234,20 @@ def checkout():
         return redirect(url_for('index'))
 
     tong_cong = 0
+    tong_phong = 0
+    tong_dichvu = 0
     for item in cart_items:
         days = calculate_days(item.get('checkin', ''), item.get('checkout', ''))
         item['so_ngay'] = days
-        tong_cong += int(item.get('GiaTien', 0)) * days
+        tong_phong += int(item.get('GiaTien', 0)) * days
         for sv in item.get('services', []):
             cost = int(sv.get('GiaTien', 0)) * int(sv.get('SoLuong', 1))
             if sv.get('TinhTheoNgay') == 1:
                 cost *= days
-            tong_cong += cost
+            tong_dichvu += cost
+    tong_cong += tong_phong + tong_dichvu
 
-    return render_template('customer/checkout.html', cart_items=cart_items, tong_cong=tong_cong)
+    return render_template('customer/checkout.html', cart_items=cart_items, tong_cong=tong_cong, tong_phong=tong_phong, tong_dichvu=tong_dichvu)
 
 
 @app.route('/confirm_booking', methods=['POST'])
@@ -404,4 +407,4 @@ def remove_service_from_cart(room_index, service_index):
             session.modified = True
             flash(f"Đã gỡ dịch vụ {removed_sv.get('TenDV')} khỏi phòng!", "info")
 
-    return redirect(url_for('cart_view'))
+    return redirect(url_for('cart_view'))
