@@ -333,7 +333,7 @@ def add_service_to_cart():
     except Exception as e:
         print(f"Loi add service: {e}")
 
-    return redirect(url_for('cart_view'))
+    return redirect(request.referrer or url_for('services'))
 
 @app.route('/cancel_booking', methods=['POST'])
 def cancel_booking_route():
