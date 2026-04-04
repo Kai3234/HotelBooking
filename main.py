@@ -17,41 +17,44 @@ BASE_URL = 'http://127.0.0.1:5000'
 @app.route('/')
 def main_index():
     get_flashed_messages()
-
     top_rooms = []
     try:
-        # Gọi sang API cổng 5000 để lấy dữ liệu
         response = requests.get(f"{BASE_URL}/api/top_rooms", timeout=5)
         if response.status_code == 200:
             top_rooms = response.json().get('data', [])
 
-            # --- FIX ĐƯỜNG DẪN ẢNH (GIỮ NGUYÊN VÌ ĐÃ CHUẨN) ---
+            # --- ĐOẠN CHỈNH SỬA Ở ĐÂY ---
             for r in top_rooms:
                 path = r.get('HinhAnhDaiDien')
                 if path and not path.startswith('http'):
+                    # 1. Dọn sạch dấu gạch chéo ở đầu path (ví dụ: /images/... thành images/...)
                     clean_path = path.lstrip('/')
-                    # Đảm bảo có dấu / giữa BASE_URL và clean_path
-                    r['HinhAnhDaiDien'] = f"{BASE_URL}/{clean_path}"
 
-            print(f"--- Đã lấy và fix đường dẫn cho {len(top_rooms)} phòng ---")
+                    # 2. Kiểm tra xem trong path đã có chữ 'static/' chưa
+                    # Nếu chưa có (vì DB chỉ lưu images/...) thì ta tự thêm vào
+                    if not clean_path.startswith('static/'):
+                        final_path = f"static/{clean_path}"
+                    else:
+                        final_path = clean_path
+
+                    # 3. Nối với BASE_URL (cổng 5000)
+                    r['HinhAnhDaiDien'] = f"{BASE_URL}/{final_path}"
+
+            print(f"--- Da lay va fix duong dan cho {len(top_rooms)} phong ---")
             if top_rooms:
+                # Dùng print không dấu để tránh lỗi OSError 22 trên Windows dcm mày
                 print(f"DEBUG PATH TRANG CHU: {top_rooms[0]['HinhAnhDaiDien']}")
 
     except Exception as e:
-        print(f"Lỗi gọi API trang chủ: {e}")
+        print(f"Loi goi API trang chu: {e}")
 
-    # --- LOGIC PHÂN QUYỀN GỌN GÀNG ---
+    # --- PHẦN PHÂN QUYỀN GIỮ NGUYÊN ---
     if 'current_user' in session:
         user = session['current_user']
-        # Nếu là nhân viên thì tống vào trang quản trị ngay và luôn
         if user.get('ChucVu') == 'nhanvien':
-            # Phải chắc chắn có route tên dashboard_admin nhé dcm mày
             return redirect(url_for('dashboard_admin'))
-
-        # Nếu là khách đã đăng nhập thì cho xem trang chủ
         return render_template('customer/index.html', top_rooms=top_rooms)
 
-    # Cho khách vãng lai chưa đăng nhập
     return render_template('customer/index.html', top_rooms=top_rooms)
 
 @app.route('/login', methods=['GET', 'POST'])

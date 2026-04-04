@@ -1,21 +1,27 @@
 from flask import jsonify, request
 from webapi import app, get_db
+from datetime import datetime, timedelta
 
 
-# Hàm hỗ trợ dọn dẹp đường dẫn ảnh (Vì DB giờ đã có static/ rồi)
+# --- HÀM HỖ TRỢ: Tự động thêm /static/ vào đường dẫn images/ từ DB ---
 def format_image_path(path):
     if not path:
-        return "static/images/default_room.jpg"
-    return path
+        return "/static/images/default_room.jpg"
+
+    clean_path = path.lstrip('/')
+    # Nếu DB chỉ lưu 'images/...' thì ta tiêm thêm 'static/' vào đầu
+    if not clean_path.startswith('static/'):
+        return f"/static/{clean_path}"
+    return f"/{clean_path}"
 
 
-# --- 1. API: LẤY 6 PHÒNG ĐỘNG (Dùng cho Trang chủ & Gợi ý) ---
+# --- 1. API: LẤY 6 PHÒNG ĐỘNG (Trang chủ & Gợi ý) ---
 @app.route('/api/top_rooms', methods=['GET'])
 def get_top_rooms():
     conn = get_db()
     try:
-        # Bốc 3 loại phòng, mỗi loại lấy 2 ảnh để thành 6 card như mày muốn
-        cursor = conn.execute("SELECT * FROM LOAIPHONG LIMIT 3")
+        # Lấy 6 phòng (trước đó bạn set LIMIT 3 nhưng lại comment là lấy 6 phòng)
+        cursor = conn.execute("SELECT * FROM LOAIPHONG LIMIT 6")
         base_rooms = [dict(row) for row in cursor.fetchall()]
 
         final_rooms = []
@@ -25,8 +31,7 @@ def get_top_rooms():
 
             for img_row in images:
                 new_room = room.copy()
-                # path bây giờ đã là 'static/images/rooms/xxx.jpg' từ DB
-                new_room['HinhAnhDaiDien'] = f"/{format_image_path(img_row['HinhAnh'])}"
+                new_room['HinhAnhDaiDien'] = format_image_path(img_row['HinhAnh'])
                 final_rooms.append(new_room)
 
         return jsonify({"status": "success", "data": final_rooms[:6]})
@@ -36,23 +41,43 @@ def get_top_rooms():
         conn.close()
 
 
-# --- 2. API: TÌM KIẾM PHÒNG (Dùng cho rooms_list) ---
+# --- 2. API: TÌM KIẾM PHÒNG ---
 @app.route('/api/search_rooms', methods=['GET'])
 def search_rooms_api():
     max_price = request.args.get('max_price', 10000000)
+    room_type = request.args.get('room_type', '').strip().lower()
+    guests = request.args.get('guests', 1)
+    
+    try:
+        guests = int(guests)
+    except:
+        guests = 1
+
     conn = get_db()
+    
     query = """
         SELECT lp.*, 
         (SELECT HinhAnh FROM HINHANH_LOAIPHONG WHERE MaLoai = lp.MaLoai LIMIT 1) as HinhAnhPath
-        FROM LOAIPHONG lp
-        WHERE lp.GiaTien <= ?
+        FROM LOAIPHONG lp WHERE lp.GiaTien <= ? AND lp.SoNguoiToiDa >= ?
     """
+    params = [max_price, guests]
+    
+    # Lọc theo loại phòng (dropdown ở frontend)
+    if room_type == 'standard':
+        query += " AND LOWER(lp.TenLoai) LIKE '%standard%'"
+    elif room_type == 'deluxe':
+        query += " AND LOWER(lp.TenLoai) LIKE '%deluxe%'"
+    elif room_type == 'suite':
+        query += " AND LOWER(lp.TenLoai) LIKE '%suite%'"
+
     try:
-        cursor = conn.execute(query, (max_price,))
+        cursor = conn.execute(query, tuple(params))
         rooms = [dict(row) for row in cursor.fetchall()]
         for r in rooms:
-            r['HinhAnhDaiDien'] = f"/{format_image_path(r['HinhAnhPath'])}"
+            r['HinhAnhDaiDien'] = format_image_path(r['HinhAnhPath'])
         return jsonify({"status": "success", "data": rooms})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
     finally:
         conn.close()
 
@@ -68,11 +93,19 @@ def get_room_detail_api(ma_loai):
 
         room_dict = dict(room)
         img_cursor = conn.execute("SELECT HinhAnh FROM HINHANH_LOAIPHONG WHERE MaLoai = ?", (ma_loai,))
-        images = [{"HinhAnh": f"/{format_image_path(row['HinhAnh'])}"} for row in img_cursor.fetchall()]
+
+        # Bốc toàn bộ danh sách ảnh để làm gallery
+        images = []
+        for row in img_cursor.fetchall():
+            path = format_image_path(row['HinhAnh'])
+            images.append({"HinhAnh": path})
 
         room_dict['HinhAnhDaiDien'] = images[0]['HinhAnh'] if images else "/static/images/default_room.jpg"
+        room_dict['DanhSachAnh'] = images  # Phải có cái này thì trang Detail mới hiện ảnh nhỏ
 
-        return jsonify({"status": "success", "data": room_dict, "images": images})
+        return jsonify({"status": "success", "data": room_dict})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
     finally:
         conn.close()
 
@@ -82,57 +115,132 @@ def get_room_detail_api(ma_loai):
 def get_services_api():
     conn = get_db()
     try:
+        # Lấy tất cả cột từ bảng DICHVU
         cursor = conn.execute("SELECT * FROM DICHVU WHERE TrangThai = 'Đang có'")
         services = [dict(row) for row in cursor.fetchall()]
+
         for s in services:
-            s['HinhAnh'] = f"/{format_image_path(s['HinhAnh'])}"
+            # Kiểm tra nếu key HinhAnh tồn tại và không rỗng
+            path = s.get('HinhAnh')
+            if path:
+                # Gọi hàm format_image_path để tự thêm /static/ nếu DB chỉ lưu images/...
+                s['HinhAnh'] = format_image_path(path)
+            else:
+                # Trả về ảnh mặc định nếu DB trống
+                s['HinhAnh'] = "/static/images/default_service.jpg"
+
         return jsonify({"status": "success", "data": services})
-    finally:
-        conn.close()
-
-
-# --- 5. API: LƯU ĐƠN ĐẶT PHÒNG ---
-@app.route('/api/save_booking', methods=['POST'])
-def save_booking_api():
-    data = request.get_json()
-    conn = get_db()
-    try:
-        # Chèn vào bảng DATPHONG
-        cursor = conn.execute(
-            "INSERT INTO DATPHONG (MaKH, TongTien, ThanhToan, TrangThai) VALUES (?, ?, ?, 'Chờ xác nhận')",
-            (data['ma_kh'], 0, data['payment'])  # Tổng tiền sẽ update sau hoặc tính toán ở client
-        )
-        ma_dp = cursor.lastrowid
-
-        # Chèn chi tiết
-        for item in data['cart']:
-            conn.execute(
-                "INSERT INTO CHITIET_DATPHONG (MaDP, MaLoai, GiaPhong, SoNguoi, NgayNhan, NgayTra) VALUES (?, ?, ?, ?, ?, ?)",
-                (ma_dp, item['MaLoai'], item['GiaTien'], item['SoNguoiToiDa'], item['checkin'], item['checkout'])
-            )
-        conn.commit()
-        return jsonify({"status": "success", "ma_dp": ma_dp})
     except Exception as e:
-        conn.rollback()
         return jsonify({"status": "error", "message": str(e)}), 500
     finally:
         conn.close()
 
 
-# --- 6. API: LỊCH SỬ ĐẶT PHÒNG ---
+# --- 5. API: LƯU ĐƠN ĐẶT PHÒNG (FIX LỖI KHÔNG LƯU LỊCH SỬ) ---
+@app.route('/api/save_booking', methods=['POST'])
+def save_booking_api():
+    data = request.get_json()
+    conn = get_db()
+    try:
+        # 1. Lấy giờ hệ thống chuẩn YYYY-MM-DD HH:MM:SS
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # 2. Đảm bảo MaKH là số nguyên
+        ma_kh = int(data['ma_kh'])
+
+        cursor = conn.execute(
+            "INSERT INTO DATPHONG (MaKH, TongTien, NgayTao, ThanhToan, TrangThai) VALUES (?, ?, ?, ?, 'Chờ xác nhận')",
+            (ma_kh, data.get('total_price', 0), now_str, data['payment'])
+        )
+        ma_dp = cursor.lastrowid
+
+        for item in data['cart']:
+            # Chuyển đổi dd/mm/yyyy -> yyyy-mm-dd để khớp với các đơn có sẵn trong DB
+            try:
+                checkin_db = datetime.strptime(item['checkin'], "%d/%m/%Y").strftime("%Y-%m-%d")
+                checkout_db = datetime.strptime(item['checkout'], "%d/%m/%Y").strftime("%Y-%m-%d")
+            except:
+                checkin_db = item['checkin']
+                checkout_db = item['checkout']
+
+            res_ctdp = conn.execute(
+                "INSERT INTO CHITIET_DATPHONG (MaDP, MaLoai, GiaPhong, SoNguoi, NgayNhan, NgayTra) VALUES (?, ?, ?, ?, ?, ?)",
+                (ma_dp, item['MaLoai'], item['GiaTien'], item.get('SoNguoiToiDa', 2), checkin_db, checkout_db)
+            )
+            ma_ctdp = res_ctdp.lastrowid
+
+            # 3. Dịch vụ (Vẫn giữ logic băm ngày của mày)
+            for sv in item.get('services', []):
+                # Sử dụng checkin_db và checkout_db ("Y-m-d") đã parse ở trên để tránh lỗi crash lúc lập lịch 
+                start_dt = datetime.strptime(checkin_db, "%Y-%m-%d")
+                end_dt = datetime.strptime(checkout_db, "%Y-%m-%d")
+                gio_sd = sv.get('gio_dat', '08:00:00')
+
+                if sv.get('TinhTheoNgay') == 1:
+                    curr = start_dt
+                    while curr < end_dt:
+                        conn.execute(
+                            "INSERT INTO DATPHONG_DICHVU (MaCTDP, MaDV, DonGia, SoLuong, Ngay, Gio, TrangThai) VALUES (?, ?, ?, ?, ?, ?, 'Chờ xử lý')",
+                            (ma_ctdp, sv['MaDV'], sv['GiaTien'], sv['SoLuong'], curr.strftime("%Y-%m-%d"), gio_sd)
+                        )
+                        curr += timedelta(days=1)
+                else:
+                    conn.execute(
+                        "INSERT INTO DATPHONG_DICHVU (MaCTDP, MaDV, DonGia, SoLuong, Ngay, Gio, TrangThai) VALUES (?, ?, ?, ?, ?, ?, 'Chờ xử lý')",
+                        (ma_ctdp, sv['MaDV'], sv['GiaTien'], sv['SoLuong'], start_dt.strftime("%Y-%m-%d"), gio_sd)
+                    )
+
+        conn.commit()  # CHỐT HẠ PHẢI CÓ DÒNG NÀY
+        return jsonify({"status": "success", "ma_dp": ma_dp})
+    except Exception as e:
+        conn.rollback()
+        print(f"CRITICAL ERROR: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
+
+# --- 6. API: LỊCH SỬ ĐẶT PHÒNG (FIX LỖI KHÔNG HIỆN ẢNH PHÒNG) ---
 @app.route('/api/history/<int:ma_kh>', methods=['GET'])
 def get_history_api(ma_kh):
     conn = get_db()
     try:
-        cursor = conn.execute("SELECT * FROM DATPHONG WHERE MaKH = ? ORDER BY NgayTao DESC", (ma_kh,))
+        # 1. Lấy danh sách đơn hàng của khách
+        cursor = conn.execute("SELECT * FROM DATPHONG WHERE MaKH = ? ORDER BY MaDP DESC", (ma_kh,))
         list_dp = [dict(row) for row in cursor.fetchall()]
+
         for dp in list_dp:
-            # Lấy chi tiết phòng
+            # 2. Lấy chi tiết từng phòng trong đơn hàng
             ct_cursor = conn.execute("""
-                SELECT ct.*, lp.TenLoai FROM CHITIET_DATPHONG ct 
-                JOIN LOAIPHONG lp ON ct.MaLoai = lp.MaLoai WHERE ct.MaDP = ?
+                SELECT ct.*, lp.TenLoai, p.SoPhong,
+                (SELECT HinhAnh FROM HINHANH_LOAIPHONG WHERE MaLoai = lp.MaLoai LIMIT 1) as HinhAnhPath
+                FROM CHITIET_DATPHONG ct 
+                JOIN LOAIPHONG lp ON ct.MaLoai = lp.MaLoai 
+                LEFT JOIN PHONG p ON ct.MaPhong = p.MaPhong
+                WHERE ct.MaDP = ?
             """, (dp['MaDP'],))
-            dp['DanhSachChiTiet'] = [dict(r) for r in ct_cursor.fetchall()]
+
+            details = []
+            for r in ct_cursor.fetchall():
+                row_dict = dict(r)
+                row_dict['HinhAnhHienThi'] = format_image_path(row_dict['HinhAnhPath'])
+
+                # 3. ĐÂY LÀ CHỖ MÀY THIẾU: Lấy danh sách dịch vụ của TỪNG PHÒNG
+                dv_cursor = conn.execute("""
+                    SELECT dv.TenDV, dpdv.SoLuong, dpdv.DonGia
+                    FROM DATPHONG_DICHVU dpdv
+                    JOIN DICHVU dv ON dpdv.MaDV = dv.MaDV
+                    WHERE dpdv.MaCTDP = ?
+                """, (row_dict['MaCTDP'],))
+
+                # Phải đặt tên là 'DanhSachDichVu' cho khớp với file history.html
+                row_dict['DanhSachDichVu'] = [dict(dv) for dv in dv_cursor.fetchall()]
+                details.append(row_dict)
+
+            dp['DanhSachChiTiet'] = details
+
         return jsonify({"status": "success", "data": list_dp})
+    except Exception as e:
+        print(f"Loi API History: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
     finally:
         conn.close()
