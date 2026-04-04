@@ -10,7 +10,6 @@
         padding: 0 20px;
     }
 
-    /* 1. HEADER SANG CHẢNH */
     .services-header h2 {
         font-size: 2.8rem;
         font-weight: 900;
@@ -25,7 +24,6 @@
         border-radius: 2px;
     }
 
-    /* 2. THÔNG BÁO PHÒNG ĐANG CHỌN (GLASSMORPHISM) */
     .room-indicator {
         background: #fff5f5;
         padding: 20px 30px;
@@ -39,7 +37,6 @@
         font-weight: 700;
     }
 
-    /* 3. SERVICE CARD "LỘT XÁC" */
     .services-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
@@ -65,6 +62,7 @@
         height: 220px;
         overflow: hidden;
         position: relative;
+        background: #f9f9f9;
     }
 
     .service-img-box img {
@@ -113,7 +111,6 @@
         -webkit-box-orient: vertical;
     }
 
-    /* 4. QUANTITY PICKER */
     .qty-picker {
         display: flex;
         align-items: center;
@@ -164,6 +161,15 @@
         background: #ff4d4d;
         transform: scale(1.05);
     }
+
+    .empty-cart-alert {
+        text-align: center;
+        padding: 40px;
+        background: #fff5f5;
+        border-radius: 20px;
+        border: 1px dashed #ff4d4d;
+        margin-bottom: 40px;
+    }
 </style>
 
 <div class="services-wrapper">
@@ -174,63 +180,93 @@
     </div>
 
     {% if not session.cart %}
-    <div style="text-align: center; padding: 100px 20px; background: white; border-radius: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.05);">
-        <i class="fa-solid fa-cart-plus" style="font-size: 4rem; color: #eee; margin-bottom: 20px;"></i>
-        <h3 style="color: #666; font-weight: 800;">Giỏ hàng đang trống!</h3>
-        <p style="color: #aaa; margin-bottom: 30px;">Mày phải đặt phòng trước khi chọn thêm dịch vụ đi kèm.</p>
-        <a href="/rooms_list" class="btn-add-service" style="text-decoration: none; display: inline-block;">ĐI CHỌN PHÒNG NGAY</a>
+    <div class="empty-cart-alert">
+        <i class="fa-solid fa-circle-info" style="font-size: 2rem; color: #ff4d4d; margin-bottom: 15px;"></i>
+        <h4 style="color: #c8102e; font-weight: 800;">Thông báo</h4>
+        <p style="color: #666;">Danh sách dịch vụ đang được hiển thị. Vui lòng đặt phòng để có thể sử dụng các dịch vụ này.</p>
+        <a href="/rooms_list" class="btn-add-service" style="text-decoration: none; display: inline-block; margin-top: 10px;">ĐI CHỌN PHÒNG NGAY</a>
     </div>
     {% else %}
-
     <div class="room-indicator">
         <i class="fa-solid fa-circle-check" style="font-size: 1.5rem;"></i>
         <span>
             Đang thêm dịch vụ cho:
             <strong style="text-decoration: underline;">
-                {% if request.args.get('item_index') %}
-                    {{ session.cart[request.args.get('item_index')|int].TenLoai }}
-                    ({{ session.cart[request.args.get('item_index')|int].checkin }})
+                {% set item_index = request.args.get('item_index', '0') | int %}
+                {% if session.cart[item_index] %}
+                    {{ session.cart[item_index]['TenLoai'] }} ({{ session.cart[item_index]['checkin'] }})
                 {% else %}
                     Tất cả phòng trong danh sách
                 {% endif %}
             </strong>
         </span>
     </div>
+    {% endif %}
 
     <div class="services-grid">
         {% for sv in dichvu_list %}
         <div class="service-card">
             <div class="service-img-box">
-                <img src="{{ sv.HinhAnh if sv.HinhAnh.startswith('http') else '/' + sv.HinhAnh }}" alt="{{ sv.TenDV }}">
-                <div class="service-price-tag">{{ "{:,.0f}".format(sv.GiaTien) }}đ</div>
+                <img src="{{ sv['HinhAnh'] }}"
+                     alt="{{ sv['TenDV'] }}"
+                     onerror="this.src='http://127.0.0.1:5000/static/images/default_service.jpg'">
+                <div class="service-price-tag">{{ "{:,.0f}".format(sv['GiaTien']|int) }}đ</div>
             </div>
 
-            <div class="service-body">
-                <h4>{{ sv.TenDV }}</h4>
-                <p title="{{ sv.MoTa }}">{{ sv.MoTa }}</p>
+       <div class="service-body">
+    <h4>{{ sv['TenDV'] }}</h4>
 
-                <form action="/add_service_to_cart" method="POST" style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
-                    <input type="hidden" name="ma_dv" value="{{ sv.MaDV }}">
-                    <input type="hidden" name="item_index" value="{{ request.args.get('item_index', 0) }}">
+    <div style="margin-bottom: 15px;">
+        <span style="font-weight: 800; color: #ff4d4d; font-size: 1.3rem;">
+            {{ "{:,.0f}".format(sv['GiaTien']|int) }}đ
+        </span>
+        {% if sv['TinhTheoNgay'] == 1 %}
+            <small style="color: #999;">/ ngày</small>
+        {% endif %}
+    </div>
 
-                    <div class="qty-picker">
-                        {% if sv.ThayDoiSL == 1 %}
-                            <button type="button" class="btn-qty" onclick="this.parentNode.querySelector('.input-qty').stepDown()">-</button>
-                            <input type="number" name="so_luong" class="input-qty" value="1" min="1">
-                            <button type="button" class="btn-qty" onclick="this.parentNode.querySelector('.input-qty').stepUp()">+</button>
-                        {% else %}
-                            <input type="number" name="so_luong" class="input-qty" value="1" readonly style="width: 80px;">
-                        {% endif %}
-                    </div>
+    <form action="/add_service_to_cart" method="POST" onsubmit="return validateBooking(event)">
+        <input type="hidden" name="ma_dv" value="{{ sv['MaDV'] }}">
+        <input type="hidden" name="item_index" value="{{ request.args.get('item_index', 0) }}">
+        <input type="hidden" name="tinh_theo_ngay" value="{{ sv['TinhTheoNgay'] }}">
 
-                    <button type="submit" class="btn-add-service">
-                        <i class="fa-solid fa-cart-plus"></i> THÊM
-                    </button>
-                </form>
+        <div style="margin-bottom: 12px;">
+            <label style="font-size: 11px; font-weight: 800; color: #888;">GIỜ SỬ DỤNG:</label>
+            <input type="time" name="gio_dat" value="08:00" required
+                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 8px;">
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div class="qty-picker">
+                {% if sv['ThayDoiSL'] == 1 %}
+                    <button type="button" class="btn-qty" onclick="this.parentNode.querySelector('.input-qty').stepDown()">-</button>
+                    <input type="number" name="so_luong" class="input-qty" value="1" min="1">
+                    <button type="button" class="btn-qty" onclick="this.parentNode.querySelector('.input-qty').stepUp()">+</button>
+                {% else %}
+                    <input type="number" name="so_luong" class="input-qty" value="1" readonly style="width: 40px; background: transparent;">
+                    <span style="font-size: 11px; color: #bbb;">(Cố định: 1)</span>
+                {% endif %}
             </div>
+
+            <button type="submit" class="btn-add-service">THÊM</button>
+        </div>
+    </form>
+</div>
         </div>
         {% endfor %}
     </div>
-    {% endif %}
 </div>
+
+<script>
+    function validateBooking(e) {
+        const hasCart = {{ 'true' if session.cart else 'false' }};
+        if (!hasCart) {
+            e.preventDefault();
+            alert("Bạn cần phải đặt phòng trước khi chọn thêm dịch vụ!");
+            window.location.href = "/rooms_list";
+            return false;
+        }
+        return true;
+    }
+</script>
 {% endblock %}

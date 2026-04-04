@@ -1,6 +1,6 @@
 {% extends 'layout/base_customer.html' %}
 
-{% block title %}Chi tiết {{ room.TenLoai }} - RED HOTEL{% endblock %}
+{% block title %}Chi tiết {{ room['TenLoai'] }} - RED HOTEL{% endblock %}
 
 {% block content %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -12,20 +12,42 @@
         padding: 0 20px;
     }
 
-    /* 1. KHUNG ẢNH ĐƠN SANG TRỌNG */
-    .single-image-container {
-        width: 100%;
-        max-height: 500px;
+    /* 1. GALLERY SANG TRỌNG (HỖ TRỢ 4 ẢNH) */
+    .gallery-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr;
+        grid-template-rows: 240px 240px;
+        gap: 15px;
+        margin-bottom: 40px;
         border-radius: 25px;
         overflow: hidden;
-        margin-bottom: 40px;
         box-shadow: 0 15px 40px rgba(0,0,0,0.1);
     }
-    .single-image-container img {
+    .gallery-item {
+        position: relative;
+        overflow: hidden;
+    }
+    .gallery-img {
         width: 100%;
         height: 100%;
         object-fit: cover;
+        transition: 0.5s ease;
+        cursor: pointer;
         display: block;
+    }
+    .gallery-item:hover .gallery-img { transform: scale(1.05); filter: brightness(0.9); }
+    
+    .g-item-1 { grid-column: 1 / 2; grid-row: 1 / 3; }
+    .g-item-2 { grid-column: 2 / 3; grid-row: 1 / 2; }
+    .g-item-3 { grid-column: 3 / 4; grid-row: 1 / 2; }
+    .g-item-4 { grid-column: 2 / 4; grid-row: 2 / 3; }
+    
+    @media (max-width: 768px) {
+        .gallery-grid { grid-template-columns: 1fr 1fr; grid-template-rows: 200px 150px; }
+        .g-item-1 { grid-column: 1 / 3; grid-row: 1 / 2; }
+        .g-item-2 { grid-column: 1 / 2; grid-row: 2 / 3; }
+        .g-item-3 { grid-column: 2 / 3; grid-row: 2 / 3; }
+        .g-item-4 { display: none; } /* Trên mobile giấu 1 tấm cho gọn */
     }
 
     /* 2. BOOKING CARD */
@@ -55,26 +77,43 @@
         <i class="fa-solid fa-chevron-left"></i> QUAY LẠI DANH SÁCH
     </a>
 
-    <div class="single-image-container">
-        <img src="{{ room['HinhAnhDaiDien'] if room['HinhAnhDaiDien'] else room['DanhSachAnh'][0]['HinhAnh'] }}" alt="{{ room.TenLoai }}">
+    <div class="gallery-grid">
+        {% if room['DanhSachAnh']|length >= 4 %}
+            <div class="gallery-item g-item-1"><img src="{{ room['DanhSachAnh'][0]['HinhAnh'] }}" class="gallery-img"></div>
+            <div class="gallery-item g-item-2"><img src="{{ room['DanhSachAnh'][1]['HinhAnh'] }}" class="gallery-img"></div>
+            <div class="gallery-item g-item-3"><img src="{{ room['DanhSachAnh'][2]['HinhAnh'] }}" class="gallery-img"></div>
+            <div class="gallery-item g-item-4"><img src="{{ room['DanhSachAnh'][3]['HinhAnh'] }}" class="gallery-img"></div>
+        {% elif room['DanhSachAnh']|length == 3 %}
+            <div class="gallery-item g-item-1"><img src="{{ room['DanhSachAnh'][0]['HinhAnh'] }}" class="gallery-img"></div>
+            <div class="gallery-item g-item-2"><img src="{{ room['DanhSachAnh'][1]['HinhAnh'] }}" class="gallery-img"></div>
+            <div class="gallery-item g-item-3" style="grid-column: 3/4; grid-row: 1/3;"><img src="{{ room['DanhSachAnh'][2]['HinhAnh'] }}" class="gallery-img"></div>
+        {% elif room['DanhSachAnh']|length == 2 %}
+            <div class="gallery-item g-item-1"><img src="{{ room['DanhSachAnh'][0]['HinhAnh'] }}" class="gallery-img"></div>
+            <div class="gallery-item g-item-2" style="grid-column: 2/4; grid-row: 1/3;"><img src="{{ room['DanhSachAnh'][1]['HinhAnh'] }}" class="gallery-img"></div>
+        {% else %}
+            <!-- Fallback hiển thị 1 ảnh đại diện hoặc 1 ảnh đầu tiên -->
+            <div class="gallery-item g-item-1" style="grid-column: 1/4; grid-row: 1/3;">
+                <img src="{{ room['HinhAnhDaiDien'] if room['HinhAnhDaiDien'] else (room['DanhSachAnh'][0]['HinhAnh'] if room['DanhSachAnh'] else 'http://127.0.0.1:5000/static/images/default_room.jpg') }}" class="gallery-img">
+            </div>
+        {% endif %}
     </div>
 
     <div style="display: grid; grid-template-columns: 1.7fr 1.3fr; gap: 40px;">
         <div class="detail-content">
-            <h1 style="font-size: 2.8rem; font-weight: 900; color: #1a1a1a; margin-bottom: 10px;">{{ room.TenLoai }}</h1>
+            <h1 style="font-size: 2.8rem; font-weight: 900; color: #1a1a1a; margin-bottom: 10px;">{{ room['TenLoai'] }}</h1>
             <p style="color: #888; font-size: 1.1rem; margin-bottom: 30px;">
                 <i class="fa-solid fa-location-dot"></i> Khu vực VIP - Hải Đăng Store Hotel
             </p>
 
             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 40px;">
-                <div class="amenity-item"><i class="fa-solid fa-users"></i> {{ room.SoNguoiToiDa }} Khách</div>
+                <div class="amenity-item"><i class="fa-solid fa-users"></i> {{ room['SoNguoiToiDa'] }} Khách</div>
                 <div class="amenity-item"><i class="fa-solid fa-expand"></i> 45m²</div>
                 <div class="amenity-item"><i class="fa-solid fa-wifi"></i> Free Wifi</div>
             </div>
 
             <h3 style="font-weight: 800; margin-bottom: 20px; border-left: 5px solid #ff4d4d; padding-left: 15px;">Mô tả phòng</h3>
             <p style="line-height: 1.8; color: #555; font-size: 1.1rem; white-space: pre-line; margin-bottom: 40px;">
-                {{ room.MoTa }}
+                {{ room['MoTa'] }}
             </p>
 
             <h3 style="font-weight: 800; margin-bottom: 20px;">Tiện ích đi kèm</h3>
@@ -89,12 +128,12 @@
         <div class="detail-sidebar">
             <div class="booking-card">
                 <div style="margin-bottom: 30px;">
-                    <span class="price-big">{{ "{:,.0f}".format(room.GiaTien) }}đ</span>
+                    <span class="price-big">{{ "{:,.0f}".format(room['GiaTien']|int) }}đ</span>
                     <span style="color: #aaa; font-weight: 600;">/ Một đêm trải nghiệm</span>
                 </div>
 
                 <form action="/add_to_cart" method="POST">
-                    <input type="hidden" name="ma_loai" value="{{ room.MaLoai }}">
+                    <input type="hidden" name="ma_loai" value="{{ room['MaLoai'] }}">
                     <label class="form-label-custom">Ngày nhận phòng</label>
                     <input type="text" id="checkin" name="checkin" class="input-date-custom" placeholder="Chọn ngày đi" required>
                     <label class="form-label-custom">Ngày trả phòng</label>
@@ -115,7 +154,7 @@
                 </div>
                 <div style="padding: 20px;">
                     <h4 style="font-weight: 800; margin-bottom: 10px;">{{ r['TenLoai'] }}</h4>
-                    <p style="color: #ff4d4d; font-weight: 700; margin-bottom: 15px;">{{ "{:,.0f}".format(r['GiaTien']) }}đ</p>
+                    <p style="color: #ff4d4d; font-weight: 700; margin-bottom: 15px;">{{ "{:,.0f}".format(r['GiaTien']|int) }}đ</p>
                     <a href="/rooms_detail/{{ r['MaLoai'] }}" style="display: block; text-align: center; background: #f5f5f5; color: #333; padding: 10px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 13px;">Chi tiết</a>
                 </div>
             </div>

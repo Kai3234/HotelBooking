@@ -1,9 +1,21 @@
 import requests
 from flask import session, redirect, render_template, request, url_for, flash
-from main import app
+from main import app, BASE_URL
 
-# Cấu hình URL của API Server (Cổng 5000)
-BASE_URL = "http://127.0.0.1:5000"
+
+# --- HÀM HỖ TRỢ: Fix đường dẫn ảnh để luôn có /static/ ---
+def fix_image_url(path):
+    if not path:
+        return f"{BASE_URL}/static/images/default_room.jpg"
+    if path.startswith('http'):
+        return path
+
+    clean_path = path.lstrip('/')
+    # Nếu DB/API trả về images/... thì ta thêm static/
+    if not clean_path.startswith('static/'):
+        return f"{BASE_URL}/static/{clean_path}"
+    return f"{BASE_URL}/{clean_path}"
+
 
 @app.route('/')
 def index():
@@ -13,53 +25,83 @@ def index():
         if response.status_code == 200:
             rooms = response.json().get('data', [])
             for r in rooms:
-                # DB đã có 'static/images/...', chỉ cần nối BASE_URL và dấu /
-                if r.get('HinhAnhDaiDien') and not r['HinhAnhDaiDien'].startswith('http'):
-                    r['HinhAnhDaiDien'] = f"{BASE_URL}/{r['HinhAnhDaiDien']}"
+                r['HinhAnhDaiDien'] = fix_image_url(r.get('HinhAnhDaiDien'))
     except Exception as e:
-        print(f"Lỗi kết nối API Trang chủ: {e}")
+        print(f"Loi goi API Trang chu: {e}")
     return render_template('customer/index.html', top_rooms=rooms)
 
 @app.route('/rooms_list')
 def rooms_list():
     rooms = []
-    checkin = request.args.get('checkin', '')
-    checkout = request.args.get('checkout', '')
+    # Bổ sung: lấy thêm các field lọc từ file HTML (max_price, room_type, adults, children)
+    max_price = request.args.get('max_price', 10000000)
+    room_type = request.args.get('room_type', '')
+    
     try:
-        params = {'checkin': checkin, 'checkout': checkout}
-        response = requests.get(f"{BASE_URL}/api/search_rooms", params=params, timeout=5)
+        adults = int(request.args.get('adults', 1))
+        children = int(request.args.get('children', 0))
+        total_guests = adults + children
+    except:
+        total_guests = 1
+        
+    search_params = {
+        'max_price': max_price,
+        'room_type': room_type,
+        'guests': total_guests
+    }
+
+    try:
+        response = requests.get(f"{BASE_URL}/api/search_rooms", params=search_params, timeout=5)
         if response.status_code == 200:
             rooms = response.json().get('data', [])
             for r in rooms:
-                if r.get('HinhAnhDaiDien') and not r['HinhAnhDaiDien'].startswith('http'):
-                    r['HinhAnhDaiDien'] = f"{BASE_URL}/{r['HinhAnhDaiDien']}"
+                r['HinhAnhDaiDien'] = fix_image_url(r.get('HinhAnhDaiDien'))
     except Exception as e:
-        print(f"Lỗi kết nối API Danh sách phòng: {e}")
+        print(f"Loi goi API Danh sach phong: {e}")
     return render_template('customer/rooms_list.html', loaiphong_list=rooms)
+
 
 @app.route('/rooms_detail/<ma_loai>')
 def room_detail(ma_loai):
     room_data = None
+    top_rooms = []  # Thêm cái này để chứa phòng gợi ý
     try:
+        # 1. Lấy chi tiết phòng
         response = requests.get(f"{BASE_URL}/api/room/{ma_loai}", timeout=5)
         if response.status_code == 200:
             result = response.json()
-            if result.get('status') == 'success':
-                room_data = result.get('data')
-                images = result.get('images', [])
-                # Sửa đường dẫn ảnh chính
-                if room_data.get('HinhAnhDaiDien') and not room_data['HinhAnhDaiDien'].startswith('http'):
-                    room_data['HinhAnhDaiDien'] = f"{BASE_URL}/{room_data['HinhAnhDaiDien']}"
-                # Sửa danh sách ảnh con
-                for img in images:
-                    if not img['HinhAnh'].startswith('http'):
-                        img['HinhAnh'] = f"{BASE_URL}/{img['HinhAnh']}"
-                room_data['DanhSachAnh'] = images
+            room_data = result.get('data')
+
+            # Cập nhật: API trả về gallery list trong ruột `room_data['DanhSachAnh']` chứ không nằm ngoài root tên `images`
+            gallery = room_data.get('DanhSachAnh', []) if room_data else []
+
+            if room_data:
+                # Fix ảnh chính
+                room_data['HinhAnhDaiDien'] = fix_image_url(room_data.get('HinhAnhDaiDien'))
+
+                # Fix ảnh trong gallery
+                for img in gallery:
+                    img['HinhAnh'] = fix_image_url(img.get('HinhAnh'))
+
+                # Đút lại vào room_data để HTML bốc ra được
+                room_data['DanhSachAnh'] = gallery
+
+        # 2. Lấy thêm top_rooms để hiện ở phần "Các lựa chọn khác" dưới đáy trang
+        res_top = requests.get(f"{BASE_URL}/api/top_rooms", timeout=5)
+        if res_top.status_code == 200:
+            top_rooms = res_top.json().get('data', [])
+            for r in top_rooms:
+                r['HinhAnhDaiDien'] = fix_image_url(r.get('HinhAnhDaiDien'))
+
     except Exception as e:
-        print(f"Lỗi kết nối API Chi tiết phòng: {e}")
-    if room_data is None:
-        return "<h1>Lỗi: Không tìm thấy phòng!</h1>", 404
-    return render_template('customer/rooms_detail.html', room=room_data)
+        print(f"Loi goi API Chi tiet phong: {e}")
+
+    if not room_data:
+        return "<h1>Khong tim thay phong!</h1>", 404
+
+    # Nhớ truyền cả top_rooms vào đây
+    return render_template('customer/rooms_detail.html', room=room_data, top_rooms=top_rooms)
+
 
 @app.route('/services')
 def services():
@@ -69,11 +111,24 @@ def services():
         if response.status_code == 200:
             dichvu = response.json().get('data', [])
             for sv in dichvu:
-                # XÓA BỎ đoạn cộng thêm '/images/'. Để DB tự lo.
-                if sv.get('HinhAnh') and not sv['HinhAnh'].startswith('http'):
-                    sv['HinhAnh'] = f"{BASE_URL}/{sv['HinhAnh']}"
+                path = sv.get('HinhAnh')
+                if path and not path.startswith('http'):
+                    # 1. Dọn dẹp dấu gạch chéo thừa ở đầu
+                    clean_path = path.lstrip('/')
+
+                    # 2. Kiểm tra nếu trong path chưa có 'static/' thì tự thêm vào
+                    if not clean_path.startswith('static/'):
+                        final_path = f"static/{clean_path}"
+                    else:
+                        final_path = clean_path
+
+                    # 3. Nối với BASE_URL (cổng 5000)
+                    sv['HinhAnh'] = f"{BASE_URL}/{final_path}"
+
     except Exception as e:
-        print(f"Lỗi dịch vụ: {e}")
+        # Dùng print không dấu để tránh lỗi OSError 22 trên Windows
+        print(f"Loi dich vu: {e}")
+
     return render_template('customer/services.html', dichvu_list=dichvu)
 
 @app.route('/cart')
@@ -91,33 +146,21 @@ def cart_view():
 @app.route('/add_to_cart', methods=['POST'])
 def add_to_cart():
     ma_loai = request.form.get('ma_loai')
-    checkin = request.form.get('checkin') or "Chưa chọn"
-    checkout = request.form.get('checkout') or "Chưa chọn"
-
-    if 'cart' not in session:
-        session['cart'] = []
-
+    checkin = request.form.get('checkin') or "Chua chon"
+    checkout = request.form.get('checkout') or "Chua chon"
+    if 'cart' not in session: session['cart'] = []
     try:
         response = requests.get(f"{BASE_URL}/api/room/{ma_loai}", timeout=5)
         if response.status_code == 200:
             room_data = response.json().get('data')
-
-            # --- FIX ĐƯỜNG DẪN ẢNH TRIỆT ĐỂ ---
-            path = room_data.get('HinhAnhDaiDien')
-            if path and not path.startswith('http'):
-                # Xóa dấu / ở đầu path nếu có để nối chuỗi không bị lỗi //
-                clean_path = path.lstrip('/')
-                room_data['HinhAnhDaiDien'] = f"{BASE_URL}/{clean_path}"
-
+            # Phải fix ảnh ngay khi bỏ vào giỏ hàng dcm mày
+            room_data['HinhAnhDaiDien'] = fix_image_url(room_data.get('HinhAnhDaiDien'))
             room_data.update({'checkin': checkin, 'checkout': checkout, 'services': []})
             session['cart'].append(room_data)
             session.modified = True
-
     except Exception as e:
-        print(f"Lỗi thêm giỏ hàng: {e}")
-
+        print(f"Loi them gio hang: {e}")
     return redirect(url_for('cart_view'))
-
 
 @app.route('/checkout')
 def checkout():
@@ -126,9 +169,9 @@ def checkout():
 
     cart_items = session.get('cart', [])
 
-    # --- QUAN TRỌNG: Sửa 'index' thành 'main_index' ---
+    # --- Cập nhật: Đã sửa 'main_index' về lại 'index' do bị ghi đè route ---
     if not cart_items:
-        return redirect(url_for('main_index'))
+        return redirect(url_for('index'))
 
     tong_cong = 0
     for item in cart_items:
@@ -138,25 +181,45 @@ def checkout():
             tong_cong += int(sv.get('GiaTien', 0)) * int(sv.get('SoLuong', 1))
 
     return render_template('customer/checkout.html', cart_items=cart_items, tong_cong=tong_cong)
+
+
 @app.route('/confirm_booking', methods=['POST'])
 def confirm_booking():
-    if 'cart' not in session or not session['cart']: return redirect(url_for('index'))
-    if 'current_user' not in session: return redirect(url_for('login'))
+    if 'cart' not in session or not session['cart']:
+        return redirect(url_for('index'))  # Đổi main_index thành index cho chắc
+    if 'current_user' not in session:
+        return redirect(url_for('login'))
+
+    # TÍNH TỔNG TIỀN (BAO GỒM CẢ DỊCH VỤ)
+    tong_cong = 0
+    for item in session['cart']:
+        tong_cong += int(item.get('GiaTien', 0))
+        for sv in item.get('services', []):
+            tong_cong += int(sv.get('GiaTien', 0)) * int(sv.get('SoLuong', 1))
+
+    # DEBUG: Kiểm tra xem MaTK có thực sự tồn tại không
+    print(f"DEBUG: User session: {session['current_user']}")
 
     booking_data = {
-        "ma_kh": session['current_user']['MaTK'],
+        "ma_kh": session['current_user'].get('MaTK') or session['current_user'].get('MaKH'),
         "cart": session['cart'],
-        "payment": request.form.get('payment_method', 'Tiền mặt')
+        "total_price": tong_cong,
+        "payment": request.form.get('payment_method', 'Tien mat')
     }
+
     try:
         response = requests.post(f"{BASE_URL}/api/save_booking", json=booking_data, timeout=10)
-        if response.status_code == 200 and response.json().get('status') == 'success':
+        result = response.json()
+        if response.status_code == 200 and result.get('status') == 'success':
             session.pop('cart', None)
             session.modified = True
             return render_template('customer/booking_success.html')
+        else:
+            print(f"Loi tu API: {result.get('message')}")
     except Exception as e:
-        print(f"Lỗi confirm: {e}")
-    return "Lỗi hệ thống lưu đơn!", 500
+        print(f"Loi confirm: {e}")
+
+    return "Loi he thong luu don!", 500
 
 
 @app.route('/history')
@@ -164,26 +227,27 @@ def history():
     if 'current_user' not in session:
         return redirect(url_for('login'))
 
-    ma_kh = session['current_user']['MaTK']
-    print(f"--- Đang lấy lịch sử cho MaKH: {ma_kh} ---")  # DEBUG DÒNG NÀY
+    # Phải lấy đúng ID, tao dùng .get cho chắc
+    user = session['current_user']
+    ma_kh = user.get('MaTK') or user.get('MaKH')
+
+    print(f"DEBUG: Dang lay lich su cho MaKH = {ma_kh}")
 
     lich_su = []
     try:
         response = requests.get(f"{BASE_URL}/api/history/{ma_kh}", timeout=5)
-        print(f"API Response Status: {response.status_code}")  # DEBUG DÒNG NÀY
-
         if response.status_code == 200:
-            lich_su = response.json().get('data', [])
-            print(f"Số lượng đơn hàng tìm thấy: {len(lich_su)}")  # DEBUG DÒNG NÀY
+            result = response.json()
+            lich_su = result.get('data', [])
 
-            # (Phần ép URL ảnh giữ nguyên như tao dạy lúc nãy)
+            # Fix ảnh cho từng chi tiết trong đơn hàng
             for dp in lich_su:
                 for ct in dp.get('DanhSachChiTiet', []):
-                    path = ct.get('HinhAnh') or ct.get('HinhAnhDaiDien')
-                    ct['HinhAnhHienThi'] = f"{BASE_URL}/{path.lstrip('/')}" if path else ""
-
+                    # Ưu tiên lấy HinhAnhHienThi từ API trả về
+                    path = ct.get('HinhAnhHienThi') or ct.get('HinhAnhPath') or ct.get('HinhAnh')
+                    ct['HinhAnhHienThi'] = fix_image_url(path)
     except Exception as e:
-        print(f"Lỗi kết nối API History: {e}")
+        print(f"Loi lay lich su: {e}")
 
     return render_template('customer/history.html', lich_su_dat=lich_su)
 
@@ -192,22 +256,35 @@ def profile():
     if 'current_user' not in session: return redirect(url_for('login'))
     return render_template('customer/profile.html')
 
+
 @app.route('/add_service_to_cart', methods=['POST'])
 def add_service_to_cart():
     if 'cart' not in session: return redirect(url_for('rooms_list'))
+
     item_index = int(request.form.get('item_index', 0))
     ma_dv = request.form.get('ma_dv')
     so_luong = int(request.form.get('so_luong', 1))
+    gio_dat = request.form.get('gio_dat', '08:00:00')
+    tinh_theo_ngay = int(request.form.get('tinh_theo_ngay', 0))
+
     try:
+        # Gọi sang API lấy chi tiết dịch vụ (đảm bảo API trả về GiaTien, MaDV, TinhTheoNgay)
         response = requests.get(f"{BASE_URL}/api/service_detail/{ma_dv}", timeout=5)
         if response.status_code == 200:
             sv_data = response.json().get('data')
+
+            # Gắn thêm thông tin khách vừa chọn
             sv_data['SoLuong'] = so_luong
+            sv_data['gio_dat'] = gio_dat
+            sv_data['TinhTheoNgay'] = tinh_theo_ngay
+
             if 0 <= item_index < len(session['cart']):
                 session['cart'][item_index]['services'].append(sv_data)
                 session.modified = True
+                flash(f"Đã thêm {sv_data['TenDV']} vào phòng!", "success")
     except Exception as e:
-        print(f"Service Error: {e}")
+        print(f"Loi add service: {e}")
+
     return redirect(url_for('cart_view'))
 
 @app.route('/cancel_booking', methods=['POST'])
