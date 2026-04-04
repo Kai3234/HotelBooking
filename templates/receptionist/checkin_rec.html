@@ -12,7 +12,7 @@
         <!-- Ô tìm kiếm -->
         <div class="search-box" style="width: 300px;">
             <i class="fa-solid fa-search"></i>
-            <input type="text" name="search" value="{{ search_query }}" placeholder="Mã đơn, Tên hoặc SĐT...">
+            <input type="text" name="search" value="{{ search_query }}" placeholder="Mã đơn, Mã CT, Tên hoặc Loại phòng...">
         </div>
 
         <div class="filter-group" style="display: flex; gap: 15px; align-items: center;">
@@ -29,8 +29,11 @@
                 <label style="font-weight: 600; font-size: 14px; white-space: nowrap;">Trạng thái:</label>
                 <select name="status_filter" class="form-control" style="width: 180px;" onchange="this.form.submit()">
                     <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Tất cả trạng thái</option>
+
+                    <option value="cho_checkin" {% if status_filter == 'cho_checkin' %}selected{% endif %}>🔔 Chờ Check-in</option>
+
                     <option value="Chờ xác nhận" {% if status_filter == 'Chờ xác nhận' %}selected{% endif %}>Chờ xác nhận</option>
-                    <option value="Đã xác nhận" {% if status_filter == 'Đã xác nhận' %}selected{% endif %}>Đã xác nhận - Chờ Check-in</option>
+                    <option value="Đã xác nhận" {% if status_filter == 'Đã xác nhận' %}selected{% endif %}>Đã xác nhận</option>
                     <option value="Đang lưu trú" {% if status_filter == 'Đang lưu trú' %}selected{% endif %}>Đang lưu trú - Đã nhận</option>
                     <option value="Hoàn tất" {% if status_filter == 'Hoàn tất' %}selected{% endif %}>Hoàn tất</option>
                     <option value="Đã hủy" {% if status_filter == 'Đã hủy' %}selected{% endif %}>Đã hủy</option>
@@ -40,8 +43,8 @@
             <button type="submit" class="btn btn-primary">Lọc</button>
 
             <!-- Nút Reset nhanh về ngày hôm nay -->
-            <a href="{{ url_for('checkin_rec') }}" class="btn btn-outline" title="Về hôm nay">
-                <i class="fa-solid fa-calendar-day"></i>
+            <a href="{{ url_for('checkin_rec_reset') }}" class="btn btn-outline" title="Làm mới bộ lọc">
+                <i class="fa-solid fa-rotate-left"></i>
             </a>
         </div>
     </form>

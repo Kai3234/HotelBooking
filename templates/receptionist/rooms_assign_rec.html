@@ -3,31 +3,40 @@
 {% block page_title %}Tra cứu & Gán phòng cho khách{% endblock %}
 
 {% block content %}
-<!-- 1. THANH CÔNG CỤ TẠI -->
+<!-- 1. THANH CÔNG CỤ -->
 <div class="card" style="margin-bottom: 20px; padding: 15px 25px;">
-    <form method="GET" action="{{ url_for('rooms_assign_rec') }}" class="toolbar">
-        <div class="search-box" style="width: 400px;">
+    <form method="GET" action="{{ url_for('rooms_assign_rec') }}" class="toolbar" style="gap: 15px; flex-wrap: wrap;">
+
+        <!-- Ô tìm kiếm -->
+        <div class="search-box" style="width: 300px;">
             <i class="fa-solid fa-search"></i>
-            <!-- Ô này sẽ tự động nhận giá trị search_query từ URL -->
-            <input type="text" name="search" value="{{ search_query }}"
-                   placeholder="Nhập chính xác Mã đơn (MaDP), Mã CT hoặc Tên khách...">
+            <input type="text" name="search" value="{{ search_query }}" placeholder="Mã đơn, Mã CT, Tên khách...">
         </div>
 
-        <div class="filter-group">
-            <select name="status" class="form-control" style="width: 180px;">
-                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Tất cả đơn</option>
-                <option value="cho_gan" {% if status_filter == 'cho_gan' %}selected{% endif %}>Chờ gán phòng</option>
-                <option value="da_gan" {% if status_filter == 'da_gan' %}selected{% endif %}>Đã gán (Chờ check-in)</option>
-                <option value="dang_o" {% if status_filter == 'dang_o' %}selected{% endif %}>Đang lưu trú</option>
+        <div class="filter-group" style="display: flex; gap: 10px;">
+            <!-- LỌC THEO LOẠI PHÒNG (MỚI) -->
+            <select name="ma_loai" class="form-control" style="width: 180px;" onchange="this.form.submit()">
+                <option value="all" {% if ma_loai_filter == 'all' %}selected{% endif %}>Tất cả loại phòng</option>
+                {% for lt in room_types %}
+                <option value="{{ lt.MaLoai }}" {% if ma_loai_filter|string == lt.MaLoai|string %}selected{% endif %}>
+                    {{ lt.TenLoai }}
+                </option>
+                {% endfor %}
             </select>
-            <button type="submit" class="btn btn-primary">Lọc / Tìm kiếm</button>
 
-            <!-- Thêm nút làm mới để quay lại danh sách tổng nhanh chóng -->
-            {% if search_query %}
-            <a href="{{ url_for('rooms_assign_rec') }}" class="btn btn-outline" title="Xóa tìm kiếm">
+            <!-- Lọc trạng thái gán -->
+            <select name="status" class="form-control" style="width: 190px;" onchange="this.form.submit()">
+                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Tất cả trạng thái đơn</option>
+                <option value="cho_gan" {% if status_filter == 'cho_gan' %}selected{% endif %}>🆘 Chờ gán phòng</option>
+                <option value="da_gan" {% if status_filter == 'da_gan' %}selected{% endif %}>✅ Đã gán (Chờ check-in)</option>
+                <option value="dang_o" {% if status_filter == 'dang_o' %}selected{% endif %}>🏨 Đang lưu trú</option>
+            </select>
+
+            <button type="submit" class="btn btn-primary">Lọc</button>
+
+            <a href="{{ url_for('rooms_assign_rec_reset') }}" class="btn btn-outline" title="Reset bộ lọc">
                 <i class="fa-solid fa-rotate-left"></i>
             </a>
-            {% endif %}
         </div>
     </form>
 </div>
