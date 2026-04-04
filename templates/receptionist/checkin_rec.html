@@ -29,8 +29,11 @@
                 <label style="font-weight: 600; font-size: 14px; white-space: nowrap;">Trạng thái:</label>
                 <select name="status_filter" class="form-control" style="width: 180px;" onchange="this.form.submit()">
                     <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Tất cả trạng thái</option>
+
+                    <option value="cho_checkin" {% if status_filter == 'cho_checkin' %}selected{% endif %}>🔔 Chờ Check-in</option>
+
                     <option value="Chờ xác nhận" {% if status_filter == 'Chờ xác nhận' %}selected{% endif %}>Chờ xác nhận</option>
-                    <option value="Đã xác nhận" {% if status_filter == 'Đã xác nhận' %}selected{% endif %}>Đã xác nhận - Chờ Check-in</option>
+                    <option value="Đã xác nhận" {% if status_filter == 'Đã xác nhận' %}selected{% endif %}>Đã xác nhận</option>
                     <option value="Đang lưu trú" {% if status_filter == 'Đang lưu trú' %}selected{% endif %}>Đang lưu trú - Đã nhận</option>
                     <option value="Hoàn tất" {% if status_filter == 'Hoàn tất' %}selected{% endif %}>Hoàn tất</option>
                     <option value="Đã hủy" {% if status_filter == 'Đã hủy' %}selected{% endif %}>Đã hủy</option>

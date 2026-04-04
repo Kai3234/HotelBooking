@@ -63,7 +63,7 @@
             </div>
             <div style="text-align: right;">
                 <p style="margin:0; font-size:12px; color:gray;">Tổng thanh toán thực tế:</p>
-                <strong style="font-size: 24px; color: var(--primary-red);">{{ "{:,.0f}".format(dp.TongTienThucTe) }}₫</strong>
+                <strong style="font-size: 24px; color: var(--primary-red);">{{ "{:,.0f}".format(dp.TongTienThucTe|default(0)) }}₫</strong>
             </div>
         </div>
     </div>
@@ -89,7 +89,7 @@
                         </td>
                         <td>{{ ct.NgayNhan }} ➔ {{ ct.NgayTra }}<br><b>{{ ct.SoNgayO }} ngày</b></td>
                         <td>{{ "{:,.0f}".format(ct.GiaPhong) }}₫</td>
-                        <td><b style="color: var(--primary-red);">{{ "{:,.0f}".format(ct.ThanhTienPhong) }}₫</b></td>
+                        <td><b style="color: var(--primary-red);">{{ "{:,.0f}".format(ct.ThanhTienPhong|default(0)) }}₫</b></td>
                         <td>
                             {% if ct.TrangThai == 'Đã nhận' and ct.NgayTra == today %}
                                 <a href="{{ url_for('confirm_checkout_detail', ma_ctdp=ct.MaCTDP) }}" class="btn-sm btn-primary">Trả phòng</a>
@@ -112,30 +112,43 @@
     </div>
 
     <!-- Footer: Nút bấm dựa trên CanPay và CanComplete -->
-    <div class="card-footer" style="display: flex; justify-content: flex-end; gap: 10px; background: #f8f9fa;">
+    <div class="card-footer" style="display: flex; justify-content: flex-end; align-items: center; background: #f8f9fa; padding: 15px 25px;">
 
-        {% if dp.CanPay %}
-        <form action="{{ url_for('pay_booking', ma_dp=dp.MaDP) }}" method="POST" style="display: flex; gap: 10px; align-items: center;">
-            <input type="hidden" name="total" value="{{ dp.TongTienThucTe }}">
-            <select name="payment_method" class="form-control" style="width: 200px;" required>
-                <option value="Tiền mặt" {% if dp.ThanhToan == 'Tiền mặt' %}selected{% endif %}>Tiền mặt</option>
-                <option value="Chuyển khoản" {% if dp.ThanhToan == 'Chuyển khoản' %}selected{% endif %}>Chuyển khoản</option>
-                <option value="VNPay" {% if dp.ThanhToan == 'VNPay' %}selected{% endif %}>VNPay</option>
-            </select>
-            <button type="submit" class="btn btn-success" onclick="return confirm('Xác nhận thu tiền?')">
-                <i class="fa-solid fa-cash-register"></i> XÁC NHẬN THANH TOÁN
-            </button>
-        </form>
+        <!-- TRƯỜNG HỢP 1: CÒN PHÒNG CHỜ CHECK-IN -->
+        {% if dp.PendingRoomsCount and dp.TrangThai == 'Đang lưu trú' and not dp.IsPaid %}
+            <div style="color: #FFA800; font-weight: 600; margin-right: 15px;">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                Không thể thanh toán: Đơn vẫn còn phòng chưa thực hiện Check-in.
+            </div>
         {% endif %}
 
+        <!-- TRƯỜNG HỢP 2: ĐỦ ĐIỀU KIỆN THANH TOÁN -->
+        {% if dp.CanPay %}
+            <form action="{{ url_for('pay_booking', ma_dp=dp.MaDP) }}" method="POST" style="display: flex; gap: 10px; align-items: center;">
+                <input type="hidden" name="total" value="{{ dp.TongTienThucTe }}">
+                <label style="font-weight: 700;">PT Thanh toán:</label>
+                <select name="payment_method" class="form-control" style="width: 200px;" required>
+                    <option value="Tiền mặt" {% if dp.ThanhToan == 'Tiền mặt' %}selected{% endif %}>Tiền mặt</option>
+                    <option value="Chuyển khoản" {% if dp.ThanhToan == 'Chuyển khoản' %}selected{% endif %}>Chuyển khoản</option>
+                </select>
+                <button type="submit" class="btn btn-success">
+                    <i class="fa-solid fa-cash-register"></i> XÁC NHẬN THANH TOÁN
+                </button>
+            </form>
+        {% endif %}
+
+        <!-- TRƯỜNG HỢP 3: ĐÃ THANH TOÁN NHƯNG CÒN PHÒNG CHƯA CHECK-OUT -->
+        {% if dp.IsPaid and not dp.CanComplete and dp.TrangThai == 'Đang lưu trú' %}
+            <div style="color: #009EF7; font-weight: 600;">
+                <i class="fa-solid fa-circle-info"></i> Đã thanh toán. Hãy thực hiện "Trả phòng" cho tất cả các phòng để Hoàn tất đơn.
+            </div>
+        {% endif %}
+
+        <!-- TRƯỜNG HỢP 4: ĐỦ ĐIỀU KIỆN HOÀN TẤT -->
         {% if dp.CanComplete %}
             <a href="{{ url_for('complete_booking', ma_dp=dp.MaDP) }}" class="btn btn-primary" style="background: #8950FC;">
                 <i class="fa-solid fa-flag-checkered"></i> XÁC NHẬN HOÀN TẤT ĐƠN
             </a>
-        {% endif %}
-
-        {% if dp.TrangThai == 'Hoàn tất' %}
-            <span class="text-success" style="font-weight: bold;"><i class="fa-solid fa-check-double"></i> ĐƠN HÀNG ĐÃ ĐÓNG</span>
         {% endif %}
     </div>
 </div>

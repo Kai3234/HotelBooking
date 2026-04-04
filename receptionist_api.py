@@ -339,13 +339,13 @@ def api_update_booking_status():
 # 2. API Danh sách Check-in (Cập nhật logic Gán/Xác nhận)
 @app.route('/api/rec/checkin-list', methods=['GET'])
 def get_checkin_list():
-    search = request.args.get('search', '').strip()
+    search = request.args.get('search', '')
     status_filter = request.args.get('status_filter', 'all')
 
     conn = get_db()
     cursor = conn.cursor()
 
-    # Query cơ bản (Giữ nguyên các JOIN để lấy đủ thông tin)
+    # Query cơ bản
     sql = """
         SELECT DP.*, KH.HoTen, KH.SDT,
                CT.MaCTDP, CT.MaPhong, CT.MaLoai, CT.NgayNhan, CT.NgayTra, 
@@ -359,56 +359,44 @@ def get_checkin_list():
     """
     params = []
 
-    # 1. Cập nhật Logic Tìm kiếm theo 4 tiêu chí: MaDP, MaCTDP, HoTen, TenLoai
+    # 1. Lọc theo tìm kiếm (Mã đơn, Tên khách, Mã chi tiết, Loại phòng)
     if search:
-        sql += """ AND (
-            DP.MaDP LIKE ? OR 
-            CT.MaCTDP LIKE ? OR 
-            KH.HoTen LIKE ? OR 
-            LP.TenLoai LIKE ?
-        )"""
-        # Tạo chuỗi tìm kiếm đại diện %keyword%
+        sql += " AND (DP.MaDP LIKE ? OR KH.HoTen LIKE ? OR CT.MaCTDP LIKE ? OR LP.TenLoai LIKE ?)"
         search_val = f'%{search}%'
-        # Truyền tham số cho 4 dấu hỏi chấm (?)
-        params.extend([search_val, search_val, search_val, search_val])
+        params.extend([search_val] * 4)
 
-    # 2. Lọc theo trạng thái đơn
-    if status_filter != 'all':
+    # 2. Lọc theo trạng thái đơn (LOGIC MỚI)
+    if status_filter == 'cho_checkin':
+        # Lọc đơn 'Đã xác nhận' HOẶC ('Đang lưu trú' nhưng vẫn còn phòng 'Chờ nhận')
+        sql += """ AND (
+            DP.TrangThai = 'Đã xác nhận' 
+            OR (DP.TrangThai = 'Đang lưu trú' AND EXISTS (
+                SELECT 1 FROM CHITIET_DATPHONG CT2 
+                WHERE CT2.MaDP = DP.MaDP AND CT2.TrangThai = 'Chờ nhận'
+            ))
+        )"""
+    elif status_filter != 'all':
         sql += " AND DP.TrangThai = ?"
         params.append(status_filter)
 
     sql += " ORDER BY DP.NgayTao DESC"
-
     cursor.execute(sql, params)
     rows = cursor.fetchall()
     conn.close()
 
-    # Gộp dữ liệu theo MaDP
+    # --- (Phần gộp dữ liệu bookings_dict và tính CanConfirm giữ nguyên như cũ) ---
     bookings_dict = {}
     for row in rows:
         ma_dp = row['MaDP']
         if ma_dp not in bookings_dict:
             bookings_dict[ma_dp] = dict(row)
             bookings_dict[ma_dp]['ChiTiet'] = []
-
-        # Đưa thông tin chi tiết vào mảng con
-        bookings_dict[ma_dp]['ChiTiet'].append({
-            'MaCTDP': row['MaCTDP'],
-            'MaPhong': row['MaPhong'],
-            'SoPhong': row['SoPhong'],
-            'TenLoai': row['TenLoai'],
-            'NgayNhan': row['NgayNhan'],
-            'NgayTra': row['NgayTra'],
-            'TrangThaiCT': row['TrangThaiCT']
-        })
+        bookings_dict[ma_dp]['ChiTiet'].append(dict(row))
 
     results = list(bookings_dict.values())
     for b in results:
-        # Logic tính toán nút Xác nhận/Check-in
         all_assigned = all(ct['MaPhong'] is not None for ct in b['ChiTiet'])
         b['CanConfirm'] = (b['TrangThai'] == 'Chờ xác nhận' and all_assigned)
-        # Thêm flag này nếu cần xử lý giao diện cho Đã xác nhận
-        b['CanCheckin'] = (b['TrangThai'] == 'Đã xác nhận' and all_assigned)
 
     return jsonify(results)
 
@@ -589,8 +577,56 @@ def get_checkout_list():
         # Chỉ cho Hoàn tất nếu Đã thanh toán (MaNV != None) và Tất cả phòng đã trả/hủy
         b['CanComplete'] = (b['TrangThai'] == 'Đang lưu trú' and b['IsPaid'] and all_returned)
 
+    for b in bookings:
+        # Lấy chi tiết phòng
+        cursor.execute("SELECT * FROM CHITIET_DATPHONG WHERE MaDP = ?", (b['MaDP'],))
+        chi_tiet_phong = [dict(row) for row in cursor.fetchall()]
+
+        has_pending_rooms = False  # Biến kiểm tra xem còn phòng nào chưa Check-in không
+        all_rooms_returned = True  # Biến kiểm tra xem tất cả phòng đã Check-out/Hủy chưa
+        all_services_handled = True  # Biến kiểm tra xem tất cả dịch vụ đã xử lý xong chưa
+
+        for ct in chi_tiet_phong:
+            # 1. KIỂM TRA PHÒNG CHỜ NHẬN
+            if ct['TrangThai'] == 'Chờ nhận':
+                has_pending_rooms = True
+
+            # 2. KIỂM TRA PHÒNG ĐANG Ở (Chưa trả)
+            if ct['TrangThai'] == 'Đã nhận':
+                all_rooms_returned = False
+
+            # 3. KIỂM TRA DỊCH VỤ CHỜ XỬ LÝ
+            cursor.execute("SELECT COUNT(*) FROM DATPHONG_DICHVU WHERE MaCTDP = ? AND TrangThai = 'Chờ xử lý'",
+                           (ct['MaCTDP'],))
+            if cursor.fetchone()[0] > 0:
+                all_services_handled = True  # Có dịch vụ chưa xong
+
+        # --- LOGIC KHÓA THANH TOÁN ---
+        b['IsPaid'] = b['MaNV'] is not None
+
+        # CHỈ CHO THANH TOÁN KHI:
+        # - Đang lưu trú
+        # - KHÔNG còn phòng nào 'Chờ nhận' (has_pending_rooms == False)
+        # - KHÔNG còn dịch vụ nào 'Chờ xử lý'
+        # - Chưa thanh toán
+        b['CanPay'] = (b['TrangThai'] == 'Đang lưu trú' and
+                       not has_pending_rooms and
+                       all_services_handled and
+                       not b['IsPaid'])
+
+        # CHỈ CHO HOÀN TẤT KHI:
+        # - Đã thanh toán (IsPaid)
+        # - TẤT CẢ phòng đã 'Đã trả' hoặc 'Đã hủy' (all_rooms_returned == True)
+        b['CanComplete'] = (b['TrangThai'] == 'Đang lưu trú' and
+                            b['IsPaid'] and
+                            all_rooms_returned)
+
+        # Gửi thêm thông tin cảnh báo cho Client
+        b['PendingRoomsCount'] = has_pending_rooms
+
     conn.close()
     return jsonify(bookings)
+
 
 
 @app.route('/api/rec/process-payment', methods=['POST'])
