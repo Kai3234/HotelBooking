@@ -220,7 +220,11 @@
                         <label class="form-label">Người đặt phòng</label>
                         <div style="background: #f9f9f9; padding: 12px 15px; border-radius: 12px; font-weight: 700; color: #333; border: 2px solid #eee; display: flex; align-items: center;">
                             <i class="fa-solid fa-user-circle" style="color: var(--primary-red); margin-right: 10px; font-size: 20px;"></i>
-                            {{ session.current_user.HoTen }}
+                            {% if 'current_user' in session %}
+                                {{ session['current_user']['HoTen'] }}
+                            {% else %}
+                                Khách vãng lai (Vui lòng đăng nhập)
+                            {% endif %}
                         </div>
                     </div>
 

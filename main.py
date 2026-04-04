@@ -139,6 +139,7 @@ def register():
 @app.route('/logout')
 def logout():
     session.pop('current_user', None)  # Xóa dict current_user khỏi session
+    session.pop('cart', None) # Xóa giỏ hàng
     return redirect(url_for('login'))
 
 
@@ -163,4 +164,4 @@ from customer import *
 
 if __name__ == '__main__':
     #Đặt cổng khác bởi vì 5000 đã được sử dụng
-    app.run(debug=True, port=5001, use_reloader=False)
+    app.run(debug=True, port=5001, use_reloader=True)

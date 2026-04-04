@@ -122,30 +122,33 @@
     .btn-main:hover { background: #ff4d4d; }
     .btn-sub {
         flex: 1; background: #f5f5f5; color: #333; text-align: center;
-        padding: 14px; border-radius: 12px; text-decoration: none; font-weight: 700;
+        padding: 14px 0; border-radius: 12px; text-decoration: none; font-weight: 700; border: none; cursor: pointer; transition: 0.3s;
     }
+    .btn-sub:hover { background: #e0e0e0; color: #ff4d4d; }
 </style>
 
 <div class="container" style="max-width: 1200px; margin: 60px auto; padding: 0 20px;">
 
     <section class="filter-wrapper">
-        <form action="/rooms_list" method="GET" class="filter-form">
+        <form action="/rooms_list" method="GET" class="filter-form" onsubmit="let cin=document.getElementById('checkin').value; let cout=document.getElementById('checkout').value; if(!cin || !cout) { alert('Vui lòng chọn đầy đủ NGÀY NHẬN và NGÀY TRẢ để xem phòng trống!'); return false; } return true;">
             <div class="filter-item">
                 <label><i class="fa-solid fa-calendar-day"></i> Ngày nhận</label>
-                <input type="text" id="checkin" name="checkin" class="form-control" value="{{ request.args.get('checkin', '') }}" placeholder="dd/mm/yyyy">
+                <input type="text" id="checkin" name="checkin" class="form-control" value="{{ request.args.get('checkin', '') }}" placeholder="dd/mm/yyyy" required>
             </div>
             <div class="filter-item">
                 <label><i class="fa-solid fa-calendar-check"></i> Ngày trả</label>
-                <input type="text" id="checkout" name="checkout" class="form-control" value="{{ request.args.get('checkout', '') }}" placeholder="dd/mm/yyyy">
+                <input type="text" id="checkout" name="checkout" class="form-control" value="{{ request.args.get('checkout', '') }}" placeholder="dd/mm/yyyy" required>
             </div>
 
             <div class="filter-item">
                 <label><i class="fa-solid fa-hotel"></i> Loại phòng</label>
                 <select name="room_type">
                     <option value="">Tất cả loại phòng</option>
-                    <option value="standard" {{ 'selected' if request.args.get('room_type') == 'standard' }}>Standard (Tiêu chuẩn)</option>
-                    <option value="deluxe" {{ 'selected' if request.args.get('room_type') == 'deluxe' }}>Deluxe (Sang trọng)</option>
-                    <option value="suite" {{ 'selected' if request.args.get('room_type') == 'suite' }}>Suite (Cao cấp nhất)</option>
+                    {% for t in all_types %}
+                    <option value="{{ t.MaLoai }}" {{ 'selected' if request.args.get('room_type') == t.MaLoai|string }}>
+                        {{ t.TenLoai }}
+                    </option>
+                    {% endfor %}
                 </select>
             </div>
 
@@ -165,7 +168,7 @@
 
     <div class="room-grid">
         {% for room in loaiphong_list %}
-        <div class="room-card">
+        <div class="room-card" style="cursor: pointer;" onclick="window.location.href='/rooms_detail/{{ room['MaLoai'] }}'">
             <div class="room-img-container">
                 <img src="{{ room['HinhAnhDaiDien'] if room['HinhAnhDaiDien'] else 'http://127.0.0.1:5000/static/images/default_room.jpg' }}" class="room-image" alt="{{ room['TenLoai'] }}">
                 <div class="price-tag">{{ "{:,.0f}".format(room['GiaTien']) }}đ</div>
@@ -179,12 +182,19 @@
                 </div>
 
                 <div class="btn-group">
-                    <a href="/rooms_detail/{{ room['MaLoai'] }}" class="btn-sub">Chi tiết</a>
-                    <form action="/add_to_cart" method="POST" style="flex: 2; display: flex;">
+                    <a href="/rooms_detail/{{ room['MaLoai'] }}" class="btn-sub" title="Xem chi tiết" onclick="event.stopPropagation();"><i class="fa-solid fa-info"></i></a>
+                    <form action="/add_to_cart" method="POST" style="flex: 1.5; display: flex;" onclick="event.stopPropagation();" onsubmit="let cin=this.querySelector('.sync-checkin').value; let cout=this.querySelector('.sync-checkout').value; if(!cin || !cout) { alert('Vui lòng CHỌN NGÀY ở bộ lọc bên trên để kiểm tra phòng trống trước khi Đặt!'); return false; } return true;">
                         <input type="hidden" name="ma_loai" value="{{ room['MaLoai'] }}">
-                        <button type="submit" class="btn-main" style="border: none; width: 100%; cursor: pointer;">
-                            ĐẶT NGAY
-                        </button>
+                        <input type="hidden" name="action_type" value="add_only">
+                        <input type="hidden" name="checkin" class="sync-checkin">
+                        <input type="hidden" name="checkout" class="sync-checkout">
+                        <button type="submit" class="btn-sub" style="width: 100%;" title="Thêm vào giỏ"><i class="fa-solid fa-cart-plus"></i></button>
+                    </form>
+                    <form action="/add_to_cart" method="POST" style="flex: 2.5; display: flex;" onclick="event.stopPropagation();" onsubmit="let cin=this.querySelector('.sync-checkin').value; let cout=this.querySelector('.sync-checkout').value; if(!cin || !cout) { alert('Vui lòng CHỌN NGÀY ở bộ lọc bên trên để kiểm tra phòng trống trước khi Đặt!'); return false; } return true;">
+                        <input type="hidden" name="ma_loai" value="{{ room['MaLoai'] }}">
+                        <input type="hidden" name="checkin" class="sync-checkin">
+                        <input type="hidden" name="checkout" class="sync-checkout">
+                        <button type="submit" class="btn-main" style="border: none; width: 100%; cursor: pointer;">ĐẶT NGAY</button>
                     </form>
                 </div>
             </div>
@@ -192,7 +202,7 @@
         {% endfor %}
 
         {% for s_room in suggested_rooms %}
-        <div class="room-card" style="border: 2px dashed #ff4d4d;">
+        <div class="room-card" style="border: 2px dashed #ff4d4d; cursor: pointer;" onclick="window.location.href='/rooms_detail/{{ s_room.MaLoai }}'">
             <div class="room-img-container">
                 <img src="{{ s_room.HinhAnhDaiDien }}" class="room-image">
                 <div class="price-tag">{{ "{:,.0f}".format(s_room.GiaTien) }}đ</div>
@@ -205,8 +215,16 @@
                     <span><i class="fa-solid fa-expand"></i> Gợi ý</span>
                 </div>
                 <div class="btn-group">
-                    <a href="/rooms_detail/{{ s_room.MaLoai }}" class="btn-sub">Chi tiết</a>
-                    <a href="/rooms_detail/{{ s_room.MaLoai }}" class="btn-main">ĐẶT NGAY</a>
+                    <a href="/rooms_detail/{{ s_room.MaLoai }}" class="btn-sub" onclick="event.stopPropagation();"><i class="fa-solid fa-info"></i></a>
+                    <form action="/add_to_cart" method="POST" style="flex: 1.5; display: flex;" onclick="event.stopPropagation();" onsubmit="let cin=this.querySelector('.sync-checkin').value; let cout=this.querySelector('.sync-checkout').value; if(!cin || !cout) { alert('Vui lòng CHỌN NGÀY ở bộ lọc bên trên để kiểm tra phòng trống trước khi Đặt!'); return false; } return true;">
+                        <input type="hidden" name="ma_loai" value="{{ s_room.MaLoai }}">
+                        <input type="hidden" name="action_type" value="add_only">
+                        <button type="submit" class="btn-sub" style="width: 100%;"><i class="fa-solid fa-cart-plus"></i></button>
+                    </form>
+                    <form action="/add_to_cart" method="POST" style="flex: 2.5; display: flex;" onclick="event.stopPropagation();" onsubmit="let cin=this.querySelector('.sync-checkin').value; let cout=this.querySelector('.sync-checkout').value; if(!cin || !cout) { alert('Vui lòng CHỌN NGÀY ở bộ lọc bên trên để kiểm tra phòng trống trước khi Đặt!'); return false; } return true;">
+                        <input type="hidden" name="ma_loai" value="{{ s_room.MaLoai }}">
+                        <button type="submit" class="btn-main" style="border: none; width: 100%; cursor: pointer;">ĐẶT NGAY</button>
+                    </form>
                 </div>
             </div>
         </div>
@@ -218,9 +236,17 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const config = { dateFormat: "d/m/Y", minDate: "today" };
-        flatpickr("#checkin", config);
-        flatpickr("#checkout", config);
+        const config = { dateFormat: "d/m/Y", minDate: "today", onChange: syncDates };
+        const pickerIn = flatpickr("#checkin", config);
+        const pickerOut = flatpickr("#checkout", config);
+
+        function syncDates() {
+            let cin = document.getElementById('checkin').value;
+            let cout = document.getElementById('checkout').value;
+            document.querySelectorAll('.sync-checkin').forEach(i => i.value = cin);
+            document.querySelectorAll('.sync-checkout').forEach(i => i.value = cout);
+        }
+        syncDates();
     });
 </script>
 {% endblock %}

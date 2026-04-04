@@ -15,6 +15,19 @@ def format_image_path(path):
     return f"/{clean_path}"
 
 
+# --- X. API: LẤY DANH SÁCH TẤT CẢ LOẠI PHÒNG (Cho Dropdown Filter) ---
+@app.route('/api/all_room_types', methods=['GET'])
+def get_all_room_types():
+    conn = get_db()
+    try:
+        cursor = conn.execute("SELECT MaLoai, TenLoai FROM LOAIPHONG ORDER BY MaLoai ASC")
+        types = [dict(row) for row in cursor.fetchall()]
+        return jsonify({"status": "success", "data": types})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
+
 # --- 1. API: LẤY 6 PHÒNG ĐỘNG (Trang chủ & Gợi ý) ---
 @app.route('/api/top_rooms', methods=['GET'])
 def get_top_rooms():
@@ -26,13 +39,16 @@ def get_top_rooms():
 
         final_rooms = []
         for room in base_rooms:
-            img_cursor = conn.execute("SELECT HinhAnh FROM HINHANH_LOAIPHONG WHERE MaLoai = ?", (room['MaLoai'],))
-            images = img_cursor.fetchall()
+            img_cursor = conn.execute("SELECT HinhAnh FROM HINHANH_LOAIPHONG WHERE MaLoai = ? ORDER BY LaAnhDaiDien DESC, MaAnh ASC LIMIT 1", (room['MaLoai'],))
+            img_row = img_cursor.fetchone()
 
-            for img_row in images:
-                new_room = room.copy()
+            new_room = room.copy()
+            if img_row:
                 new_room['HinhAnhDaiDien'] = format_image_path(img_row['HinhAnh'])
-                final_rooms.append(new_room)
+            else:
+                new_room['HinhAnhDaiDien'] = "/static/images/default_room.jpg"
+                
+            final_rooms.append(new_room)
 
         return jsonify({"status": "success", "data": final_rooms[:6]})
     except Exception as e:
@@ -45,13 +61,24 @@ def get_top_rooms():
 @app.route('/api/search_rooms', methods=['GET'])
 def search_rooms_api():
     max_price = request.args.get('max_price', 10000000)
-    room_type = request.args.get('room_type', '').strip().lower()
+    room_type = request.args.get('room_type', '').strip()
     guests = request.args.get('guests', 1)
+    checkin_str = request.args.get('checkin', '').strip()
+    checkout_str = request.args.get('checkout', '').strip()
     
     try:
         guests = int(guests)
     except:
         guests = 1
+
+    checkin_date = None
+    checkout_date = None
+    if checkin_str and checkout_str:
+        try:
+            checkin_date = datetime.strptime(checkin_str, '%d/%m/%Y').strftime('%Y-%m-%d')
+            checkout_date = datetime.strptime(checkout_str, '%d/%m/%Y').strftime('%Y-%m-%d')
+        except:
+            pass
 
     conn = get_db()
     
@@ -62,13 +89,27 @@ def search_rooms_api():
     """
     params = [max_price, guests]
     
-    # Lọc theo loại phòng (dropdown ở frontend)
-    if room_type == 'standard':
-        query += " AND LOWER(lp.TenLoai) LIKE '%standard%'"
-    elif room_type == 'deluxe':
-        query += " AND LOWER(lp.TenLoai) LIKE '%deluxe%'"
-    elif room_type == 'suite':
-        query += " AND LOWER(lp.TenLoai) LIKE '%suite%'"
+    # Lọc theo MÃ loại phòng (ID) từ frontend thay vì tên chuỗi
+    if room_type.isdigit():
+        query += " AND lp.MaLoai = ?"
+        params.append(int(room_type))
+
+    # Lọc loại trừ những loại phòng đã HẾT THỰC TẾ TRONG KHOẢNG NGÀY NÀY
+    if checkin_date and checkout_date:
+        query += """
+            AND (
+                SELECT COUNT(*) FROM PHONG p WHERE p.MaLoai = lp.MaLoai AND p.TrangThai = 'Sẵn sàng'
+            ) > (
+                SELECT COUNT(*) FROM CHITIET_DATPHONG ctdp 
+                WHERE ctdp.MaLoai = lp.MaLoai 
+                  AND ctdp.TrangThai IN ('Chờ nhận', 'Đã nhận') 
+                  AND (ctdp.NgayNhan < ? AND ctdp.NgayTra > ?)
+            )
+        """
+        # Nếu (Ngày nhận của Booking cũ < Ngày trả của form TRONG KHI Ngày trả của Booking cũ > Ngày nhận của form)
+        # Tức là có sự trồng lấn (Overlapping). Số phòng sẵn sàng TRỪ ĐI số booking trồng lấn PHẢI > 0 thì mới hiển thị.
+        params.append(checkout_date)
+        params.append(checkin_date)
 
     try:
         cursor = conn.execute(query, tuple(params))

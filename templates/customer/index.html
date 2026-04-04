@@ -87,7 +87,7 @@
     </p>
 
     <div class="search-container">
-        <form action="/rooms_list" method="GET" style="display: flex; width: 100%; align-items: center;">
+        <form action="/rooms_list" method="GET" style="display: flex; width: 100%; align-items: center;" onsubmit="let cin=document.getElementById('checkin').value; let cout=document.getElementById('checkout').value; if(!cin || !cout) { alert('Vui lòng chọn NGÀY NHẬN và NGÀY TRẢ phòng!'); return false; } return true;">
             <div class="search-item">
                 <label><i class="fa-solid fa-calendar-days"></i> Ngày nhận</label>
                 <input type="text" id="checkin" name="checkin" placeholder="Chọn ngày" required>
@@ -101,12 +101,11 @@
             <div class="search-item guest-picker-container" id="guestPicker">
                 <label><i class="fa-solid fa-user-group"></i> Khách & Phòng</label>
                 <div class="guest-display" id="guestDisplay">
-                    <span id="displayText">2 người lớn · 0 trẻ em · 1 phòng</span>
+                    <span id="displayText">2 người lớn · 1 phòng</span>
                     <i class="fa-solid fa-chevron-down"></i>
                 </div>
 
                 <input type="hidden" name="adults" id="inputAdults" value="2">
-                <input type="hidden" name="children" id="inputChildren" value="0">
                 <input type="hidden" name="rooms" id="inputRooms" value="1">
                 <input type="hidden" name="pets" id="inputPets" value="0">
 
@@ -117,14 +116,6 @@
                             <button type="button" class="btn-counter" onclick="updateVal('adults', -1)">-</button>
                             <span id="valAdults" style="font-weight: 800; min-width: 20px; text-align: center;">2</span>
                             <button type="button" class="btn-counter" onclick="updateVal('adults', 1)">+</button>
-                        </div>
-                    </div>
-                    <div class="counter-item">
-                        <span class="counter-label">Trẻ em</span>
-                        <div class="counter-controls">
-                            <button type="button" class="btn-counter" onclick="updateVal('children', -1)">-</button>
-                            <span id="valChildren" style="font-weight: 800; min-width: 20px; text-align: center;">0</span>
-                            <button type="button" class="btn-counter" onclick="updateVal('children', 1)">+</button>
                         </div>
                     </div>
                     <div class="counter-item">
@@ -166,7 +157,7 @@
 
     <div class="room-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 35px;">
         {% for room in top_rooms %}
-        <div class="room-card">
+        <div class="room-card" style="cursor: pointer;" onclick="window.location.href='/rooms_detail/{{ room['MaLoai'] }}'">
             <div style="overflow: hidden; position: relative;">
                 <img src="{{ room['HinhAnhDaiDien'] if room['HinhAnhDaiDien'] else 'http://127.0.0.1:5000/static/images/default_room.jpg' }}" class="room-image" alt="{{ room['TenLoai'] }}">
                 <div style="position: absolute; top: 15px; left: 15px; background: #ff4d4d; color: white; padding: 6px 15px; border-radius: 5px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">
@@ -182,7 +173,7 @@
                         <span style="color: #ff4d4d; font-weight: 800; font-size: 1.5rem;">{{ "{:,.0f}".format(room['GiaTien']) }}đ</span>
                         <small style="color: #aaa; font-weight: 600;">/đêm</small>
                     </div>
-                    <a href="/rooms_detail/{{ room['MaLoai'] }}" style="background: #333; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: bold; transition: 0.3s;">
+                    <a href="/rooms_detail/{{ room['MaLoai'] }}" onclick="event.stopPropagation();" style="background: #333; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: bold; transition: 0.3s;">
                         Chi tiết
                     </a>
                 </div>
@@ -200,7 +191,7 @@
 
         {% for room in top_rooms|reverse %}
         {% if loop.index <= 3 %}
-        <div class="room-card">
+        <div class="room-card" style="cursor: pointer;" onclick="window.location.href='/rooms_detail/{{ room['MaLoai'] }}'">
             <div style="overflow: hidden;">
                 <img src="{{ room['HinhAnhDaiDien'] if room['HinhAnhDaiDien'] else 'http://127.0.0.1:5000/static/images/default_room.jpg' }}" class="room-image">
             </div>
@@ -209,7 +200,7 @@
                 <p style="color: #888; font-size: 14px; margin-bottom: 20px;"><i class="fa-solid fa-users"></i> Phù hợp cho {{ room['SoNguoiToiDa'] }} khách</p>
                 <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #eee; padding-top: 20px;">
                     <div><span style="color: #ff4d4d; font-weight: 800; font-size: 1.5rem;">{{ "{:,.0f}".format(room['GiaTien']) }}đ</span></div>
-                    <a href="/rooms_detail/{{ room['MaLoai'] }}" style="background: #333; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: bold;">Chi tiết</a>
+                    <a href="/rooms_detail/{{ room['MaLoai'] }}" onclick="event.stopPropagation();" style="background: #333; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: bold;">Chi tiết</a>
                 </div>
             </div>
         </div>
@@ -283,9 +274,22 @@
         document.addEventListener('click', (e) => { if (!guestPicker.contains(e.target)) { guestDropdown.classList.remove('show'); guestPicker.classList.remove('active'); } });
         guestDropdown.addEventListener('click', (e) => e.stopPropagation());
     });
-    let counts = { adults: 2, children: 0, rooms: 1, pets: false };
+    
+    function syncDatesToForm(formElement) {
+        let cin = document.getElementById('checkin').value;
+        let cout = document.getElementById('checkout').value;
+        if(!cin || !cout) {
+            alert("Vui lòng chọn Ngày Nhận và Ngày Trả trên bộ lọc trước khi thêm vào giỏ hàng!");
+            return false;
+        }
+        formElement.querySelector('input[name="checkin"]').value = cin;
+        formElement.querySelector('input[name="checkout"]').value = cout;
+        return true;
+    }
+
+    let counts = { adults: 2, rooms: 1, pets: false };
     function updateVal(type, change) {
-        if (counts[type] + change < (type === 'children' ? 0 : 1)) return;
+        if (counts[type] + change < 1) return;
         counts[type] += change;
         document.getElementById('val' + type.charAt(0).toUpperCase() + type.slice(1)).innerText = counts[type];
         document.getElementById('input' + type.charAt(0).toUpperCase() + type.slice(1)).value = counts[type];
@@ -293,7 +297,7 @@
     }
     function updatePets(cb) { counts.pets = cb.checked; document.getElementById('inputPets').value = counts.pets ? 1 : 0; renderText(); }
     function renderText() {
-        let text = `${counts.adults} người lớn · ${counts.children} trẻ em · ${counts.rooms} phòng`;
+        let text = `${counts.adults} người lớn · ${counts.rooms} phòng`;
         if (counts.pets) text += ` · 🐾`;
         document.getElementById('displayText').innerText = text;
     }
