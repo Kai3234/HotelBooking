@@ -83,6 +83,30 @@ def rooms_list():
     return render_template('customer/rooms_list.html', loaiphong_list=rooms, all_types=all_types)
 
 
+@app.route('/search_global')
+def search_global():
+    query = request.args.get('query', '').strip()
+    rooms = []
+    services = []
+    if query:
+        try:
+            response = requests.get(f"{BASE_URL}/api/search_global", params={"query": query}, timeout=5)
+            if response.status_code == 200:
+                data = response.json().get('data', {})
+                rooms = data.get('rooms', [])
+                services = data.get('services', [])
+                
+                # Fix image URLs
+                for r in rooms:
+                    r['HinhAnhDaiDien'] = fix_image_url(r.get('HinhAnhDaiDien'))
+                for s in services:
+                    s['HinhAnh'] = fix_image_url(s.get('HinhAnh'))
+        except Exception as e:
+            print(f"Loi goi API Tim kiem toan cuc: {e}")
+            
+    return render_template('customer/search_results.html', query=query, rooms=rooms, services=services)
+
+
 @app.route('/rooms_detail/<ma_loai>')
 def room_detail(ma_loai):
     room_data = None

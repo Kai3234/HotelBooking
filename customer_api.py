@@ -285,3 +285,48 @@ def get_history_api(ma_kh):
         return jsonify({"status": "error", "message": str(e)}), 500
     finally:
         conn.close()
+
+# --- 7. API: TÌM KIẾM TOÀN CỤC (PHÒNG VÀ DỊCH VỤ) ---
+@app.route('/api/search_global', methods=['GET'])
+def search_global_api():
+    query = request.args.get('query', '').strip()
+    conn = get_db()
+    try:
+        # Tìm phòng
+        room_query = """
+            SELECT lp.*, 
+            (SELECT HinhAnh FROM HINHANH_LOAIPHONG WHERE MaLoai = lp.MaLoai LIMIT 1) as HinhAnhPath
+            FROM LOAIPHONG lp 
+            WHERE lp.TenLoai LIKE ? OR lp.MoTa LIKE ?
+        """
+        like_query = f"%{query}%"
+        room_cursor = conn.execute(room_query, (like_query, like_query))
+        rooms = [dict(row) for row in room_cursor.fetchall()]
+        for r in rooms:
+            r['HinhAnhDaiDien'] = format_image_path(r.get('HinhAnhPath'))
+
+        # Tìm dịch vụ
+        svc_query = """
+            SELECT * FROM DICHVU 
+            WHERE TrangThai = 'Đang có' AND (TenDV LIKE ? OR MoTa LIKE ?)
+        """
+        svc_cursor = conn.execute(svc_query, (like_query, like_query))
+        services = [dict(row) for row in svc_cursor.fetchall()]
+        for s in services:
+            path = s.get('HinhAnh')
+            if path:
+                s['HinhAnh'] = format_image_path(path)
+            else:
+                s['HinhAnh'] = "/static/images/default_service.jpg"
+
+        return jsonify({
+            "status": "success",
+            "data": {
+                "rooms": rooms,
+                "services": services
+            }
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
