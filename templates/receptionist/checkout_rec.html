@@ -129,7 +129,8 @@
                 <label style="font-weight: 700;">PT Thanh toán:</label>
                 <select name="payment_method" class="form-control" style="width: 200px;" required>
                     <option value="Tiền mặt" {% if dp.ThanhToan == 'Tiền mặt' %}selected{% endif %}>Tiền mặt</option>
-                    <option value="Chuyển khoản" {% if dp.ThanhToan == 'Chuyển khoản' %}selected{% endif %}>Chuyển khoản</option>
+                    <option value="Chuyển khoản" {% if dp.ThanhToan == 'Chuyển khoản' %}selected{% endif %}>Chuyển khoản ngân hàng</option>
+                    <option value="VNPay" {% if dp.ThanhToan == 'Chuyển khoản' %}selected{% endif %}>Ví điện tử VNPay</option>
                 </select>
                 <button type="submit" class="btn btn-success">
                     <i class="fa-solid fa-cash-register"></i> XÁC NHẬN THANH TOÁN
