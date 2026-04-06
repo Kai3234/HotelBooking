@@ -38,7 +38,8 @@
                 <h4 style="font-weight: 700; margin-bottom: 20px;">
                     <i class="fa-solid fa-concierge-bell" style="color: #ff4d4d;"></i> Dịch vụ bổ sung
                 </h4>
-                {% set has_service = false %}
+                {% set ns = namespace(has_service=false) %}
+
                 {% for item in cart_items %}
                     {% if item['services'] %}
                         {% for sv in item['services'] %}
@@ -60,11 +61,11 @@
                                     {% endif %}
                                 </span>
                             </div>
-                            {% set has_service = true %}
+                            {% set ns.has_service = true %}
                         {% endfor %}
                     {% endif %}
                 {% endfor %}
-                {% if not has_service %}
+                {% if not ns.has_service %}
                     <p style="color: #999; font-style: italic; font-size: 14px;">Không có dịch vụ bổ sung nào được chọn.</p>
                 {% endif %}
             </div>
