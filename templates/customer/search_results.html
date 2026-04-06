@@ -1,0 +1,75 @@
+{% extends "layout/base_customer.html" %}
+
+{% block title %}Kết quả tìm kiếm - RED HOTEL{% endblock %}
+
+{% block content %}
+<div class="search-results-page">
+    <div class="section-header" style="margin-bottom: 30px;">
+        <h2 style="font-size: 28px; color: #333; border-left: 5px solid #ff4d4d; padding-left: 15px;">
+            Kết quả tìm kiếm cho: <span class="text-red">"{{ query }}"</span>
+        </h2>
+    </div>
+
+    {% if not rooms and not services %}
+        <div class="alert alert-warning" style="padding: 20px; border-radius: 12px; font-size: 16px;">
+            <i class="fa-solid fa-circle-exclamation"></i> Không tìm thấy kết quả nào phù hợp với từ khóa của bạn. Vui lòng thử lại với từ khóa khác!
+        </div>
+    {% else %}
+        
+        {% if rooms %}
+        <div class="results-section" style="margin-bottom: 50px;">
+            <h3 style="font-size: 22px; color: #555; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px;">
+                <i class="fa-solid fa-door-open"></i> Phòng phù hợp ({{ rooms|length }})
+            </h3>
+            <div class="room-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 30px;">
+                {% for p in rooms %}
+                <div class="room-card" onclick="window.location.href='/rooms_detail/{{ p.MaLoai }}'" style="cursor: pointer; background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 5px 15px rgba(0,0,0,0.08); transition: transform 0.3s; border: 1px solid #eee;">
+                    <div class="room-img" style="height: 220px; position: relative;">
+                        <img src="{{ p.HinhAnhDaiDien }}" alt="{{ p.TenLoai }}" style="width: 100%; height: 100%; object-fit: cover;">
+                        <div class="room-price" style="position: absolute; bottom: 15px; right: 15px; background: rgba(255,77,77,0.9); color: white; padding: 8px 15px; border-radius: 20px; font-weight: bold;">
+                            {{ "{:,.0f}".format(p.GiaTien).replace(',', '.') }} ₫/đêm
+                        </div>
+                    </div>
+                    <div class="room-info" style="padding: 20px;">
+                        <h3 style="margin-top: 0; color: #333; font-size: 20px;">{{ p.TenLoai }}</h3>
+                        <p style="color: #666; font-size: 14px; margin-bottom: 15px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis;">
+                            {{ p.MoTa }}
+                        </p>
+                        <div class="room-meta" style="display: flex; gap: 15px; color: #666; font-size: 14px;">
+                            <span><i class="fa-solid fa-users"></i> {{ p.SoNguoiToiDa }} người</span>
+                            <span><i class="fa-solid fa-bed"></i> 1 Giường</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if services %}
+        <div class="results-section">
+            <h3 style="font-size: 22px; color: #555; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px;">
+                <i class="fa-solid fa-spa"></i> Dịch vụ phù hợp ({{ services|length }})
+            </h3>
+            <div class="service-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px;">
+                {% for s in services %}
+                <div class="service-card" onclick="window.location.href='/services'" style="cursor: pointer; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #eaeaea;">
+                    <div class="service-img" style="height: 180px;">
+                        <img src="{{ s.HinhAnh }}" alt="{{ s.TenDV }}" style="width: 100%; height: 100%; object-fit: cover;">
+                    </div>
+                    <div class="service-info" style="padding: 15px;">
+                        <h4 style="margin: 0 0 10px 0; color: #333; font-size: 18px;">{{ s.TenDV }}</h4>
+                        <div class="price" style="color: #ff4d4d; font-weight: bold; font-size: 16px;">
+                            {{ "{:,.0f}".format(s.GiaTien).replace(',', '.') }} ₫
+                            {% if s.TinhTheoNgay == 1 %}/ ngày{% else %}/ lần{% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        
+    {% endif %}
+</div>
+{% endblock %}
