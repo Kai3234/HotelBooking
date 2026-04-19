@@ -130,6 +130,9 @@
 <div class="container" style="max-width: 1200px; margin: 60px auto; padding: 0 20px;">
 
     <section class="filter-wrapper">
+        <div style="margin-bottom: 20px; font-size: 14px; color: #0056b3; font-weight: 600; text-align: center; background-color: #e7f1ff; padding: 10px; border-radius: 8px; border: 1px dashed #0056b3;">
+            <i class="fa-solid fa-circle-info"></i> Hướng dẫn: Vui lòng chọn Ngày nhận & Ngày trả, sau đó nhấn nút <strong>"LỌC KẾT QUẢ"</strong> để xem danh sách phòng trống chính xác nhất!
+        </div>
         <form action="/rooms_list" method="GET" class="filter-form" onsubmit="let cin=document.getElementById('checkin').value; let cout=document.getElementById('checkout').value; if(!cin || !cout) { alert('Vui lòng chọn đầy đủ NGÀY NHẬN và NGÀY TRẢ để xem phòng trống!'); return false; } return true;">
             <div class="filter-item">
                 <label><i class="fa-solid fa-calendar-day"></i> Ngày nhận</label>
@@ -168,7 +171,7 @@
 
     <div class="room-grid">
         {% for room in loaiphong_list %}
-        <div class="room-card" style="cursor: pointer;" onclick="window.location.href='/rooms_detail/{{ room['MaLoai'] }}'">
+        <div class="room-card" style="cursor: pointer;" onclick="window.location.href='/rooms_detail/{{ room['MaLoai'] }}?checkin={{ request.args.get('checkin', '') }}&checkout={{ request.args.get('checkout', '') }}'">
             <div class="room-img-container">
                 <img src="{{ room['HinhAnhDaiDien'] if room['HinhAnhDaiDien'] else 'http://127.0.0.1:5000/static/images/default_room.jpg' }}" class="room-image" alt="{{ room['TenLoai'] }}">
                 <div class="price-tag">{{ "{:,.0f}".format(room['GiaTien']) }}đ</div>
@@ -182,7 +185,7 @@
                 </div>
 
                 <div class="btn-group">
-                    <a href="/rooms_detail/{{ room['MaLoai'] }}" class="btn-sub" title="Xem chi tiết" onclick="event.stopPropagation();"><i class="fa-solid fa-info"></i></a>
+                    <a href="/rooms_detail/{{ room['MaLoai'] }}?checkin={{ request.args.get('checkin', '') }}&checkout={{ request.args.get('checkout', '') }}" class="btn-sub" title="Xem chi tiết" onclick="event.stopPropagation();"><i class="fa-solid fa-info"></i></a>
                     <form action="/add_to_cart" method="POST" style="flex: 1.5; display: flex;" onclick="event.stopPropagation();" onsubmit="let cin=this.querySelector('.sync-checkin').value; let cout=this.querySelector('.sync-checkout').value; if(!cin || !cout) { alert('Vui lòng CHỌN NGÀY ở bộ lọc bên trên để kiểm tra phòng trống trước khi Đặt!'); return false; } return true;">
                         <input type="hidden" name="ma_loai" value="{{ room['MaLoai'] }}">
                         <input type="hidden" name="action_type" value="add_only">
@@ -202,7 +205,7 @@
         {% endfor %}
 
         {% for s_room in suggested_rooms %}
-        <div class="room-card" style="border: 2px dashed #ff4d4d; cursor: pointer;" onclick="window.location.href='/rooms_detail/{{ s_room.MaLoai }}'">
+        <div class="room-card" style="border: 2px dashed #ff4d4d; cursor: pointer;" onclick="window.location.href='/rooms_detail/{{ s_room.MaLoai }}?checkin={{ request.args.get('checkin', '') }}&checkout={{ request.args.get('checkout', '') }}'">
             <div class="room-img-container">
                 <img src="{{ s_room.HinhAnhDaiDien }}" class="room-image">
                 <div class="price-tag">{{ "{:,.0f}".format(s_room.GiaTien) }}đ</div>
@@ -215,7 +218,7 @@
                     <span><i class="fa-solid fa-expand"></i> Gợi ý</span>
                 </div>
                 <div class="btn-group">
-                    <a href="/rooms_detail/{{ s_room.MaLoai }}" class="btn-sub" onclick="event.stopPropagation();"><i class="fa-solid fa-info"></i></a>
+                    <a href="/rooms_detail/{{ s_room.MaLoai }}?checkin={{ request.args.get('checkin', '') }}&checkout={{ request.args.get('checkout', '') }}" class="btn-sub" onclick="event.stopPropagation();"><i class="fa-solid fa-info"></i></a>
                     <form action="/add_to_cart" method="POST" style="flex: 1.5; display: flex;" onclick="event.stopPropagation();" onsubmit="let cin=this.querySelector('.sync-checkin').value; let cout=this.querySelector('.sync-checkout').value; if(!cin || !cout) { alert('Vui lòng CHỌN NGÀY ở bộ lọc bên trên để kiểm tra phòng trống trước khi Đặt!'); return false; } return true;">
                         <input type="hidden" name="ma_loai" value="{{ s_room.MaLoai }}">
                         <input type="hidden" name="action_type" value="add_only">

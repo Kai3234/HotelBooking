@@ -135,9 +135,9 @@
                 <form action="/add_to_cart" method="POST" onsubmit="let cin=document.getElementById('checkin').value; let cout=document.getElementById('checkout').value; if(!cin || !cout) { alert('Lỗi: Bạn chưa chọn Ngày nhận và Ngày trả phòng!'); return false; } return true;">
                     <input type="hidden" name="ma_loai" value="{{ room['MaLoai'] }}">
                     <label class="form-label-custom">Ngày nhận phòng</label>
-                    <input type="text" id="checkin" name="checkin" class="input-date-custom" placeholder="Chọn ngày đi" required>
+                    <input type="text" id="checkin" name="checkin" class="input-date-custom" placeholder="Chọn ngày đi" value="{{ request.args.get('checkin', '') }}" required>
                     <label class="form-label-custom">Ngày trả phòng</label>
-                    <input type="text" id="checkout" name="checkout" class="input-date-custom" placeholder="Chọn ngày về" required>
+                    <input type="text" id="checkout" name="checkout" class="input-date-custom" placeholder="Chọn ngày về" value="{{ request.args.get('checkout', '') }}" required>
                     <div style="display: flex; gap: 10px;">
                         <button type="submit" name="action_type" value="add_only" class="btn-book-now" style="flex: 1; background: #f5f5f5; color: #333;" title="Thêm vào giỏ hàng"><i class="fa-solid fa-cart-plus"></i></button>
                         <button type="submit" class="btn-book-now" style="flex: 4;">ĐẶT PHÒNG NGAY <i class="fa-solid fa-arrow-right"></i></button>
@@ -151,14 +151,14 @@
         <h3 style="font-weight: 900; font-size: 1.8rem; color: #1a1a1a; margin-bottom: 35px;">Các lựa chọn khác dành cho bạn</h3>
         <div class="room-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 25px;">
             {% for r in top_rooms %}
-            <div class="room-card" style="background: white; border-radius: 20px; overflow: hidden; border: 1px solid #f0f0f0; transition: 0.3s; cursor: pointer;" onclick="window.location.href='/rooms_detail/{{ r['MaLoai'] }}'">
+            <div class="room-card" style="background: white; border-radius: 20px; overflow: hidden; border: 1px solid #f0f0f0; transition: 0.3s; cursor: pointer;" onclick="window.location.href='/rooms_detail/{{ r['MaLoai'] }}?checkin={{ request.args.get('checkin', '') }}&checkout={{ request.args.get('checkout', '') }}'">
                 <div style="height: 180px; overflow: hidden; position: relative;">
                     <img src="{{ r['HinhAnhDaiDien'] }}" style="width: 100%; height: 100%; object-fit: cover;">
                 </div>
                 <div style="padding: 20px;">
                     <h4 style="font-weight: 800; margin-bottom: 10px;">{{ r['TenLoai'] }}</h4>
                     <p style="color: #ff4d4d; font-weight: 700; margin-bottom: 15px;">{{ "{:,.0f}".format(r['GiaTien']|int) }}đ</p>
-                    <a href="/rooms_detail/{{ r['MaLoai'] }}" style="display: block; text-align: center; background: #f5f5f5; color: #333; padding: 10px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 13px;" onclick="event.stopPropagation()">Chi tiết</a>
+                    <a href="/rooms_detail/{{ r['MaLoai'] }}?checkin={{ request.args.get('checkin', '') }}&checkout={{ request.args.get('checkout', '') }}" style="display: block; text-align: center; background: #f5f5f5; color: #333; padding: 10px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 13px;" onclick="event.stopPropagation()">Chi tiết</a>
                 </div>
             </div>
             {% endfor %}
